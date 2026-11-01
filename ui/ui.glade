@@ -1,57 +1,20 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Generated with glade 3.40.0 -->
+<?xml version='1.0' encoding='utf-8'?>
 <interface>
-  <requires lib="gtk+" version="3.24"/>
+  <requires lib="gtk" version="4.0" />
   <object class="GtkMessageDialog" id="ui_confirm_dialog">
-    <property name="can-focus">False</property>
-    <property name="window-position">center</property>
-    <property name="type-hint">dialog</property>
     <property name="message-type">question</property>
     <property name="buttons">ok-cancel</property>
-    <property name="text" translatable="yes">&lt;span&gt;&lt;b&gt;Warning&lt;/b&gt;&lt;/span&gt;</property>
-    <property name="use-markup">True</property>
-    <property name="secondary-text" translatable="yes">Changes have been made . To ensure these changes take effect, a system restart is required. Please save any work and click 'OK' to complete the process.</property>
-    <child internal-child="vbox">
-      <object class="GtkBox">
-        <property name="can-focus">False</property>
-        <property name="orientation">vertical</property>
-        <property name="spacing">2</property>
-        <child internal-child="action_area">
-          <object class="GtkButtonBox">
-            <property name="can-focus">False</property>
-            <property name="margin-start">3</property>
-            <property name="margin-end">3</property>
-            <property name="margin-top">3</property>
-            <property name="margin-bottom">3</property>
-            <property name="homogeneous">True</property>
-            <property name="layout-style">end</property>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">False</property>
-            <property name="position">0</property>
-          </packing>
-        </child>
-      </object>
-    </child>
-  </object>
+    <property name="text" translatable="1">&lt;span&gt;&lt;b&gt;Warning&lt;/b&gt;&lt;/span&gt;</property>
+    <property name="use-markup">1</property>
+    <property name="secondary-text" translatable="1">Changes have been made . To ensure these changes take effect, a system restart is required. Please save any work and click 'OK' to complete the process.</property>
+    </object>
   <object class="GtkMessageDialog" id="ui_info_dialog">
-    <property name="can-focus">False</property>
-    <property name="modal">True</property>
-    <property name="window-position">center-on-parent</property>
-    <property name="type-hint">dialog</property>
-    <property name="gravity">center</property>
+    <property name="modal">1</property>
     <property name="message-type">warning</property>
     <property name="buttons">ok-cancel</property>
-    <property name="text" translatable="yes">&lt;span&gt;&lt;b&gt;⚠️ Important Notice: ⚠️&lt;/b&gt;&lt;/span&gt;</property>
-    <property name="use-markup">True</property>
-    <property name="secondary-text" translatable="yes">This application is developed and maintained by the ParsLinux team to facilitate Nvidia graphics driver installation. The drivers are sourced from official ParsLinux and Nvidia repositories.
+    <property name="text" translatable="1">&lt;span&gt;&lt;b&gt;⚠️ Important Notice: ⚠️&lt;/b&gt;&lt;/span&gt;</property>
+    <property name="use-markup">1</property>
+    <property name="secondary-text" translatable="1">This application is developed and maintained by the ParsLinux team to facilitate Nvidia graphics driver installation. The drivers are sourced from official ParsLinux and Nvidia repositories.
 
 &lt;b&gt;Driver Source and Usage&lt;/b&gt;
 While this is an official ParsLinux application, the graphics drivers themselves are developed by Nvidia Corporation. ParsLinux provides this installation tool as a convenience for our users, but the drivers remain the intellectual property of Nvidia Corporation.
@@ -61,596 +24,355 @@ Please note that while we strive to ensure a smooth installation process, ParsLi
 
 &lt;b&gt;Issue Reporting:&lt;/b&gt;
 Feel free to report any issues or concerns via our GitHub repository: &lt;a href="https://github.com/parslinux/parslinux-nvidia-installer"&gt; ParsLinux GitHub &lt;/a&gt;</property>
-    <property name="secondary-use-markup">True</property>
-    <child internal-child="vbox">
-      <object class="GtkBox">
-        <property name="can-focus">True</property>
-        <property name="orientation">vertical</property>
-        <property name="spacing">2</property>
-        <child internal-child="action_area">
-          <object class="GtkButtonBox">
-            <property name="visible">True</property>
-            <property name="can-focus">True</property>
-            <property name="receives-default">True</property>
-            <property name="margin-start">2</property>
-            <property name="margin-end">2</property>
-            <property name="margin-top">1</property>
-            <property name="margin-bottom">1</property>
-            <property name="layout-style">end</property>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">False</property>
-            <property name="position">0</property>
-          </packing>
-        </child>
-        <child>
-          <placeholder/>
-        </child>
-      </object>
-    </child>
-  </object>
+    <property name="secondary-use-markup">1</property>
+    </object>
   <object class="GtkApplicationWindow" id="ui_main_window">
     <property name="width-request">500</property>
-    <property name="can-focus">False</property>
-    <property name="window-position">center</property>
     <property name="icon-name">parslinux-nvidia-installer</property>
     <child>
       <object class="GtkBox" id="ui_main_box">
-        <property name="visible">True</property>
-        <property name="can-focus">False</property>
         <property name="orientation">vertical</property>
         <child>
           <object class="GtkBox">
-            <property name="width-request">25</property>
-            <property name="height-request">25</property>
-            <property name="visible">True</property>
-            <property name="can-focus">False</property>
             <property name="halign">center</property>
             <property name="valign">start</property>
-            <property name="margin-start">3</property>
-            <property name="margin-end">3</property>
-            <property name="margin-top">13</property>
-            <property name="margin-bottom">13</property>
-            <property name="spacing">21</property>
+            <property name="spacing">18</property>
+            <style>
+              <class name="gpu-header-badge"/>
+            </style>
             <child>
-              <object class="GtkImage">
-                <property name="width-request">60</property>
-                <property name="height-request">50</property>
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
+              <object class="GtkPicture">
+                <property name="width-request">58</property>
+                <property name="height-request">58</property>
+                <property name="can-shrink">1</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
-                <property name="pixbuf">../data/assets/nvidia_logo.png</property>
+                <property name="file">../data/assets/nvidia_logo.png</property>
               </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">False</property>
-                <property name="position">0</property>
-              </packing>
             </child>
             <child>
               <object class="GtkBox" id="ui_gpu_info_box">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="margin-start">3</property>
-                <property name="margin-end">3</property>
+                <property name="valign">center</property>
                 <property name="orientation">vertical</property>
                 <child>
-                  <placeholder/>
+                  <placeholder />
                 </child>
               </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="position">1</property>
-              </packing>
             </child>
           </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">True</property>
-            <property name="position">0</property>
-          </packing>
         </child>
         <child>
           <object class="GtkStack" id="ui_main_stack">
-            <property name="visible">True</property>
-            <property name="can-focus">False</property>
+            <property name="vexpand">1</property>
             <property name="margin-start">5</property>
             <property name="margin-end">5</property>
             <property name="margin-top">7</property>
             <child>
-              <object class="GtkBox" id="ui_nvidia_box">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="margin-start">13</property>
-                <property name="margin-end">13</property>
-                <property name="orientation">vertical</property>
-                <child>
-                  <object class="GtkStack" id="ui_info_stack">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="margin-start">10</property>
-                    <property name="margin-end">10</property>
+              <object class="GtkStackPage">
+                <property name="name">page_main</property>
+                <property name="title" translatable="1">page_main</property>
+                <property name="child">
+                  <object class="GtkBox" id="ui_nvidia_box">
+                    <property name="margin-start">13</property>
+                    <property name="margin-end">13</property>
+                    <property name="orientation">vertical</property>
                     <child>
-                      <object class="GtkBox" id="ui_disabled_gpu_box">
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="valign">start</property>
-                        <property name="resize-mode">immediate</property>
-                        <property name="orientation">vertical</property>
-                        <property name="spacing">13</property>
+                      <object class="GtkStack" id="ui_info_stack">
+                        <property name="margin-start">10</property>
+                        <property name="margin-end">10</property>
                         <child>
-                          <object class="GtkLabel">
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <property name="label" translatable="yes">This application indicates that your secondary NVIDIA GPU is currently disabled. To activate it, simply click the 'Enable GPU' button next to this message.</property>
-                            <property name="wrap">True</property>
-                            <property name="max-width-chars">40</property>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">True</property>
-                            <property name="position">0</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <object class="GtkButton" id="ui_enable_button">
-                            <property name="label" translatable="yes">Enable GPU</property>
-                            <property name="visible">True</property>
-                            <property name="can-focus">True</property>
-                            <property name="receives-default">True</property>
-                            <property name="halign">center</property>
-                            <property name="valign">start</property>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">False</property>
-                            <property name="pack-type">end</property>
-                            <property name="position">2</property>
-                          </packing>
-                        </child>
-                      </object>
-                      <packing>
-                        <property name="name">page1</property>
-                        <property name="title" translatable="yes">page1</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkBox" id="ui_enabled_gpu_box">
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="margin-bottom">8</property>
-                        <property name="orientation">vertical</property>
-                        <child>
-                          <object class="GtkBox" id="ui_controller_box">
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <property name="orientation">vertical</property>
-                            <property name="spacing">13</property>
-                            <child>
-                              <object class="GtkBox">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
+                          <object class="GtkStackPage">
+                            <property name="name">page1</property>
+                            <property name="title" translatable="1">page1</property>
+                            <property name="child">
+                              <object class="GtkCenterBox" id="ui_disabled_gpu_box">
+                                <property name="valign">start</property>
                                 <property name="orientation">vertical</property>
-                                <property name="spacing">13</property>
-                                <child>
+                                <property name="start-widget">
                                   <object class="GtkBox">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <child>
-                                      <object class="GtkLabel">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="label" translatable="yes">Use Nvidia Repository</property>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkSwitch" id="ui_repo_switch">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">True</property>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="pack-type">end</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">1</property>
-                                  </packing>
-                                </child>
-                                <style>
-                                  <class name="title"/>
-                                  <class name="tweak"/>
-                                </style>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">0</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkBox" id="ui_drv_box">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="orientation">vertical</property>
-                                <property name="spacing">5</property>
-                                <child>
-                                  <object class="GtkBox" id="ui_gpu_box">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
                                     <property name="orientation">vertical</property>
                                     <child>
-                                      <placeholder/>
+                                      <object class="GtkLabel">
+                                        <property name="label" translatable="1">This application indicates that your secondary NVIDIA GPU is currently disabled. To activate it, simply click the 'Enable GPU' button next to this message.</property>
+                                        <property name="wrap">1</property>
+                                        <property name="max-width-chars">40</property>
+                                      </object>
                                     </child>
                                   </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">1</property>
-                                  </packing>
-                                </child>
-                                <child>
-                                  <object class="GtkSeparator">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">2</property>
-                                  </packing>
-                                </child>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">1</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkCheckButton" id="ui_disable_check_button">
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="receives-default">False</property>
-                                <property name="draw-indicator">True</property>
-                                <child>
+                                </property>
+                                <property name="end-widget">
                                   <object class="GtkBox">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
+                                    <property name="orientation">vertical</property>
+                                    <child>
+                                      <object class="GtkButton" id="ui_enable_button">
+                                        <property name="label" translatable="1">Enable GPU</property>
+                                        <property name="focusable">1</property>
+                                        <property name="receives-default">1</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </property>
+                              </object>
+                            </property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkStackPage">
+                            <property name="name">page2</property>
+                            <property name="title" translatable="1">page2</property>
+                            <property name="child">
+                              <object class="GtkBox" id="ui_enabled_gpu_box">
+                                <property name="margin-bottom">8</property>
+                                <property name="orientation">vertical</property>
+                                <child>
+                                  <object class="GtkBox" id="ui_controller_box">
+                                    <property name="orientation">vertical</property>
                                     <property name="spacing">13</property>
                                     <child>
-                                      <object class="GtkImage">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="pixbuf">../data/assets/video_card_disabled.svg</property>
+                                      <object class="GtkBox">
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">13</property>
+                                        <style>
+                                          <class name="title" />
+                                          <class name="tweak" />
+                                        </style>
+                                        <child>
+                                          <object class="GtkCenterBox">
+                                            <property name="start-widget">
+                                              <object class="GtkBox">
+                                                <child>
+                                                  <object class="GtkLabel">
+                                                    <property name="label" translatable="1">Use Nvidia Repository</property>
+                                                  </object>
+                                                </child>
+                                              </object>
+                                            </property>
+                                            <property name="end-widget">
+                                              <object class="GtkBox">
+                                                <child>
+                                                  <object class="GtkSwitch" id="ui_repo_switch">
+                                                    <property name="focusable">1</property>
+                                                  </object>
+                                                </child>
+                                              </object>
+                                            </property>
+                                          </object>
+                                        </child>
                                       </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
                                     </child>
                                     <child>
-                                      <object class="GtkLabel">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="label" translatable="yes">Disable Secondary GPU</property>
-                                        <property name="justify">fill</property>
+                                      <object class="GtkBox" id="ui_drv_box">
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">5</property>
+                                        <child>
+                                          <object class="GtkBox" id="ui_gpu_box">
+                                            <property name="orientation">vertical</property>
+                                            <child>
+                                              <placeholder />
+                                            </child>
+                                          </object>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSeparator" />
+                                        </child>
                                       </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkCheckButton" id="ui_disable_check_button">
+                                        <property name="focusable">1</property>
+                                        <child>
+                                          <object class="GtkBox">
+                                            <property name="halign">start</property>
+                                            <property name="spacing">13</property>
+                                            <child>
+                                              <object class="GtkImage">
+                                                <property name="file">../data/assets/video_card_disabled.svg</property>
+                                              </object>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel">
+                                                <property name="label" translatable="1">Disable Secondary GPU</property>
+                                                <property name="justify">fill</property>
+                                              </object>
+                                            </child>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton" id="ui_apply_chg_button">
+                                        <property name="label" translatable="1">Apply Changes</property>
+                                        <property name="focusable">1</property>
+                                        <property name="receives-default">1</property>
+                                        <property name="halign">center</property>
+                                        </object>
+                                    </child>
+                                    <child>
+                                      <placeholder />
                                     </child>
                                   </object>
                                 </child>
                               </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">2</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkButton" id="ui_apply_chg_button">
-                                <property name="label" translatable="yes">Apply Changes</property>
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="receives-default">True</property>
-                                <property name="halign">center</property>
-                                <property name="image-position">right</property>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">3</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <placeholder/>
-                            </child>
+                            </property>
                           </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">True</property>
-                            <property name="position">0</property>
-                          </packing>
                         </child>
                       </object>
-                      <packing>
-                        <property name="name">page2</property>
-                        <property name="title" translatable="yes">page2</property>
-                        <property name="position">1</property>
-                      </packing>
                     </child>
                   </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">True</property>
-                    <property name="position">0</property>
-                  </packing>
-                </child>
+                </property>
               </object>
-              <packing>
-                <property name="name">page_main</property>
-                <property name="title" translatable="yes">page_main</property>
-              </packing>
             </child>
             <child>
-              <object class="GtkBox" id="ui_novidia_box">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="margin-start">24</property>
-                <property name="margin-end">24</property>
-                <property name="margin-top">24</property>
-                <property name="margin-bottom">24</property>
-                <property name="orientation">vertical</property>
-                <property name="spacing">16</property>
-                <property name="valign">center</property>
-                <child>
-                  <object class="GtkImage">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="pixbuf">../data/assets/video_card.svg</property>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="position">0</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkLabel">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="use-markup">True</property>
-                    <property name="label" translatable="yes">&lt;span font_weight="bold" font_size="large" foreground="#F8FAFC"&gt;NVIDIA Grafik Kartı Algılanmadı&lt;/span&gt;</property>
-                    <property name="justify">center</property>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="position">1</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkLabel" id="ui_detected_gpu_label">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="use-markup">True</property>
-                    <property name="label">&lt;span foreground="#94A3B8"&gt;Algılanan Donanım: Taranıyor...&lt;/span&gt;</property>
-                    <property name="justify">center</property>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="position">2</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkLabel">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="use-markup">True</property>
-                    <property name="label" translatable="yes">&lt;span foreground="#64748B" font_size="small"&gt;ParsLinux Nvidia Installer, resmi NVIDIA sürücülerini yönetmek için tasarlanmıştır.
-Arayüzü ve özellikleri test etmek için aşağıdaki butondan simülasyon modunu açabilirsiniz.&lt;/span&gt;</property>
-                    <property name="justify">center</property>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="position">3</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkButton" id="ui_btn_simulate">
-                    <property name="label" translatable="yes">🎮 Arayüzü İncele (Simülasyon Modu)</property>
-                    <property name="visible">True</property>
-                    <property name="can-focus">True</property>
-                    <property name="receives-default">True</property>
-                    <property name="halign">center</property>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="position">4</property>
-                  </packing>
-                </child>
-              </object>
-              <packing>
+              <object class="GtkStackPage">
                 <property name="name">page1</property>
-                <property name="title" translatable="yes">page1</property>
-                <property name="position">1</property>
-              </packing>
+                <property name="title" translatable="1">page1</property>
+                <property name="child">
+                  <object class="GtkBox" id="ui_novidia_box">
+                    <property name="margin-start">24</property>
+                    <property name="margin-end">24</property>
+                    <property name="margin-top">24</property>
+                    <property name="margin-bottom">24</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">16</property>
+                    <property name="valign">center</property>
+                    <child>
+                      <object class="GtkImage">
+                        <property name="valign">center</property>
+                        <property name="file">../data/assets/video_card.svg</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="valign">center</property>
+                        <property name="use-markup">1</property>
+                        <property name="label" translatable="1">&lt;span font_weight="bold" font_size="large" foreground="#F8FAFC"&gt;NVIDIA Grafik Kartı Algılanmadı&lt;/span&gt;</property>
+                        <property name="justify">center</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="ui_detected_gpu_label">
+                        <property name="valign">center</property>
+                        <property name="use-markup">1</property>
+                        <property name="label">&lt;span foreground="#94A3B8"&gt;Algılanan Donanım: Taranıyor...&lt;/span&gt;</property>
+                        <property name="justify">center</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="valign">center</property>
+                        <property name="use-markup">1</property>
+                        <property name="label" translatable="1">&lt;span foreground="#64748B" font_size="small"&gt;ParsLinux Nvidia Installer, resmi NVIDIA sürücülerini yönetmek için tasarlanmıştır.
+Arayüzü ve özellikleri test etmek için aşağıdaki butondan simülasyon modunu açabilirsiniz.&lt;/span&gt;</property>
+                        <property name="justify">center</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="ui_btn_simulate">
+                        <property name="valign">center</property>
+                        <property name="label" translatable="1">🎮 Arayüzü İncele (Simülasyon Modu)</property>
+                        <property name="focusable">1</property>
+                        <property name="receives-default">1</property>
+                        <property name="halign">center</property>
+                      </object>
+                    </child>
+                  </object>
+                </property>
+              </object>
             </child>
             <child>
-              <object class="GtkBox" id="ui_box_vte">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="margin-start">20</property>
-                <property name="margin-end">20</property>
-                <property name="orientation">vertical</property>
-                <child>
-                  <placeholder/>
-                </child>
-                <child>
-                  <object class="GtkBox" id="ui_box_vte_buttons">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="halign">center</property>
-                    <property name="valign">center</property>
-                    <property name="margin-start">3</property>
-                    <property name="margin-end">3</property>
-                    <property name="margin-top">5</property>
-                    <property name="margin-bottom">10</property>
-                    <property name="homogeneous">True</property>
-                    <child>
-                      <object class="GtkButton" id="ui_button_reboot">
-                        <property name="label" translatable="yes">Reboot</property>
-                        <property name="visible">True</property>
-                        <property name="can-focus">True</property>
-                        <property name="receives-default">True</property>
-                        <property name="margin-end">5</property>
-                      </object>
-                      <packing>
-                        <property name="expand">False</property>
-                        <property name="fill">True</property>
-                        <property name="position">0</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkButton" id="ui_button_exit">
-                        <property name="label" translatable="yes">Exit</property>
-                        <property name="visible">True</property>
-                        <property name="can-focus">True</property>
-                        <property name="receives-default">True</property>
-                        <property name="margin-end">5</property>
-                      </object>
-                      <packing>
-                        <property name="expand">False</property>
-                        <property name="fill">True</property>
-                        <property name="position">1</property>
-                      </packing>
-                    </child>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">True</property>
-                    <property name="pack-type">end</property>
-                    <property name="position">1</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkLabel" id="ui_vte_status_label">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="halign">center</property>
-                    <property name="margin-top">5</property>
-                    <property name="margin-bottom">5</property>
-                    <property name="use-markup">True</property>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">True</property>
-                    <property name="pack-type">end</property>
-                    <property name="position">2</property>
-                  </packing>
-                </child>
-              </object>
-              <packing>
+              <object class="GtkStackPage">
                 <property name="name">page_vte</property>
-                <property name="title" translatable="yes">page_vte</property>
-                <property name="position">2</property>
-              </packing>
+                <property name="title" translatable="1">page_vte</property>
+                <property name="child">
+                  <object class="GtkCenterBox" id="ui_box_vte">
+                    <property name="margin-start">20</property>
+                    <property name="margin-end">20</property>
+                    <property name="orientation">vertical</property>
+                    <property name="start-widget">
+                      <object class="GtkBox">
+                        <property name="orientation">vertical</property>
+                        <child>
+                          <placeholder />
+                        </child>
+                      </object>
+                    </property>
+                    <property name="end-widget">
+                      <object class="GtkBox">
+                        <property name="orientation">vertical</property>
+                        <child>
+                          <object class="GtkLabel" id="ui_vte_status_label">
+                            <property name="halign">center</property>
+                            <property name="margin-top">5</property>
+                            <property name="margin-bottom">5</property>
+                            <property name="use-markup">1</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox" id="ui_box_vte_buttons">
+                            <property name="halign">center</property>
+                            <property name="valign">center</property>
+                            <property name="margin-start">3</property>
+                            <property name="margin-end">3</property>
+                            <property name="margin-top">5</property>
+                            <property name="margin-bottom">10</property>
+                            <property name="homogeneous">1</property>
+                            <child>
+                              <object class="GtkButton" id="ui_button_reboot">
+                                <property name="label" translatable="1">Reboot</property>
+                                <property name="focusable">1</property>
+                                <property name="receives-default">1</property>
+                                <property name="margin-end">5</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkButton" id="ui_button_exit">
+                                <property name="label" translatable="1">Exit</property>
+                                <property name="focusable">1</property>
+                                <property name="receives-default">1</property>
+                                <property name="margin-end">5</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </property>
+                  </object>
+                </property>
+              </object>
             </child>
           </object>
-          <packing>
-            <property name="expand">True</property>
-            <property name="fill">True</property>
-            <property name="position">1</property>
-          </packing>
         </child>
         <child>
           <object class="GtkBox">
-            <property name="visible">True</property>
-            <property name="can-focus">False</property>
             <property name="orientation">vertical</property>
             <property name="spacing">5</property>
             <child>
-              <object class="GtkSeparator">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="position">1</property>
-              </packing>
+              <object class="GtkSeparator" />
             </child>
             <child>
               <object class="GtkLabel">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
                 <property name="margin-top">5</property>
                 <property name="margin-bottom">5</property>
                 <property name="label">© parslinux</property>
                 <attributes>
-                  <attribute name="weight" value="light"/>
+                  <attribute name="weight" value="light" />
                 </attributes>
               </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="position">2</property>
-              </packing>
             </child>
           </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">True</property>
-            <property name="position">3</property>
-          </packing>
         </child>
       </object>
     </child>
     <child type="titlebar">
       <object class="GtkHeaderBar">
-        <property name="visible">True</property>
-        <property name="can-focus">False</property>
-        <property name="title" translatable="yes">ParsLinux Nvidia Installer</property>
-        <property name="show-close-button">True</property>
-        <child>
+        <property name="title-widget"><object class="GtkLabel"><property name="label" translatable="1">ParsLinux Nvidia Installer</property><style><class name="title" /></style></object></property><child>
           <object class="GtkButton" id="ui_about_button">
-            <property name="visible">True</property>
-            <property name="can-focus">True</property>
-            <property name="receives-default">True</property>
-            <property name="image-position">top</property>
-            <property name="always-show-image">True</property>
+            <property name="focusable">1</property>
+            <property name="receives-default">1</property>
             <child>
               <object class="GtkImage">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
                 <property name="icon-name">dialog-information-symbolic</property>
               </object>
             </child>
@@ -660,11 +382,7 @@ Arayüzü ve özellikleri test etmek için aşağıdaki butondan simülasyon mod
     </child>
   </object>
   <object class="GtkAboutDialog" id="ui_about_dialog">
-    <property name="can-focus">False</property>
-    <property name="window-position">center-always</property>
     <property name="icon-name">parslinux-nvidia-installer</property>
-    <property name="type-hint">dialog</property>
-    <property name="gravity">center</property>
     <property name="transient-for">ui_main_window</property>
     <property name="program-name">ParsLinux Nvidia Installer</property>
     <property name="version">1.0.0</property>
@@ -675,115 +393,58 @@ Arayüzü ve özellikleri test etmek için aşağıdaki butondan simülasyon mod
     <property name="artists">ParsLinux Artwork Team &lt;dev@parslinux.org&gt;</property>
     <property name="logo-icon-name">parslinux-nvidia-installer</property>
     <property name="license-type">gpl-3-0</property>
-    <child internal-child="vbox">
-      <object class="GtkBox">
-        <property name="can-focus">False</property>
-        <property name="orientation">vertical</property>
-        <property name="spacing">2</property>
-        <child internal-child="action_area">
-          <object class="GtkButtonBox">
-            <property name="can-focus">False</property>
-            <property name="layout-style">end</property>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">False</property>
-            <property name="position">0</property>
-          </packing>
-        </child>
-        <child>
-          <placeholder/>
-        </child>
-      </object>
-    </child>
-  </object>
+    </object>
   <object class="GtkWindow" id="ui_window_reboot">
-    <property name="can-focus">False</property>
-    <property name="resizable">False</property>
-    <child>
+    <property name="resizable">0</property>
+    <property name="child">
       <object class="GtkBox">
-        <property name="visible">True</property>
-        <property name="can-focus">False</property>
         <property name="orientation">vertical</property>
         <child>
           <object class="GtkLabel">
+            <property name="vexpand">1</property>
             <property name="height-request">100</property>
-            <property name="visible">True</property>
-            <property name="can-focus">False</property>
             <property name="margin-start">13</property>
             <property name="margin-end">13</property>
-            <property name="label" translatable="yes">You must reboot your device before using this application.</property>
+            <property name="label" translatable="1">You must reboot your device before using this application.</property>
           </object>
-          <packing>
-            <property name="expand">True</property>
-            <property name="fill">True</property>
-            <property name="position">0</property>
-          </packing>
         </child>
         <child>
-          <object class="GtkBox">
-            <property name="visible">True</property>
-            <property name="can-focus">False</property>
+          <object class="GtkCenterBox">
             <property name="margin-start">30</property>
             <property name="margin-end">30</property>
             <property name="margin-bottom">13</property>
-            <property name="spacing">13</property>
-            <property name="homogeneous">True</property>
-            <child>
-              <object class="GtkButton" id="ui_button_reboot_dlg">
-                <property name="label" translatable="yes">Reboot</property>
-                <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
-                <property name="valign">start</property>
-                <property name="margin-start">1</property>
+            <property name="end-widget">
+              <object class="GtkBox">
+                <child>
+                  <object class="GtkButton" id="ui_button_exit_dlg">
+                    <property name="hexpand">1</property>
+                    <property name="label" translatable="1">Exit</property>
+                    <property name="focusable">1</property>
+                    <property name="receives-default">1</property>
+                    <property name="valign">start</property>
+                    <property name="margin-end">1</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkButton" id="ui_button_reboot_dlg">
+                    <property name="hexpand">1</property>
+                    <property name="label" translatable="1">Reboot</property>
+                    <property name="focusable">1</property>
+                    <property name="receives-default">1</property>
+                    <property name="valign">start</property>
+                    <property name="margin-start">1</property>
+                  </object>
+                </child>
               </object>
-              <packing>
-                <property name="expand">True</property>
-                <property name="fill">True</property>
-                <property name="pack-type">end</property>
-                <property name="position">0</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkButton" id="ui_button_exit_dlg">
-                <property name="label" translatable="yes">Exit</property>
-                <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
-                <property name="valign">start</property>
-                <property name="margin-end">1</property>
-              </object>
-              <packing>
-                <property name="expand">True</property>
-                <property name="fill">True</property>
-                <property name="pack-type">end</property>
-                <property name="position">2</property>
-              </packing>
-            </child>
+            </property>
           </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">True</property>
-            <property name="position">2</property>
-          </packing>
         </child>
       </object>
-    </child>
+    </property>
     <child type="titlebar">
       <object class="GtkHeaderBar">
-        <property name="visible">True</property>
-        <property name="can-focus">False</property>
-        <property name="title" translatable="yes">Reboot required</property>
-        <property name="show-close-button">True</property>
-        <child>
-          <placeholder/>
+        <property name="title-widget"><object class="GtkLabel"><property name="label" translatable="1">ParsLinux Nvidia Installer</property><style><class name="title" /></style></object></property><child>
+          <placeholder />
         </child>
       </object>
     </child>

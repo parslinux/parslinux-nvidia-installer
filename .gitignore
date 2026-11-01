@@ -180,3 +180,6 @@ cython_debug/
 *.glade~
 *.glade#
 
+
+*.deb
+.vscode/

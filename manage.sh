@@ -60,6 +60,9 @@ if [ -n "$ACTION" ]; then
         package|paketle)
             exec ./package.sh "$@"
             ;;
+        detect|algila|tara)
+            exec ./run.sh --detect "$@"
+            ;;
         test|testler)
             exec python3 -m unittest discover -s tests -p "test_*.py" -v
             ;;

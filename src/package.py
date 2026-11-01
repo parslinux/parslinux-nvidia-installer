@@ -8,14 +8,15 @@ Executed directly or via PolicyKit (pkexec) to manage drivers and system service
 import os
 import re
 import sys
+import shutil
 import subprocess
 
 try:
-    import apt
-    import apt_pkg
+    import apt  # type: ignore
+    import apt_pkg  # type: ignore
     apt_pkg.init_system()
     HAS_APT = True
-except ImportError:
+except (ImportError, AttributeError):
     HAS_APT = False
     apt = None
     apt_pkg = None
@@ -280,9 +281,18 @@ def check_sec_state():
     return not (os.path.isfile(nvidia_disable_gpu_path) or os.path.isfile(legacy_disable_gpu_path))
 
 
-_LINUX_HEADERS_RE = re.compile(r"^linux-headers-[a-zA-Z0-9\.\-_+]+$")
-_NVIDIA_DRIVER_RE = re.compile(r"^nvidia-[a-zA-Z0-9\-_]+$")
-_AI_DEV_RE = re.compile(r"^(libcudnn[0-9]*(-dev)?|libnvinfer[0-9]*(-dev)?|tensorrt[a-zA-Z0-9\-_]*|nvidia-prime)$")
+_NVIDIA_EXTRA_PKGS = (
+    "xserver-xorg-video-nvidia",
+    "libgl1-nvidia-glvnd-glx",
+    "glx-alternative-nvidia",
+    "mangohud",
+    "timeshift",
+    "goverlay",
+)
+
+_LINUX_HEADERS_RE = re.compile(r"^linux-headers-[a-zA-Z0-9._+-]+$")
+_NVIDIA_DRIVER_RE = re.compile(r"^nvidia-[a-zA-Z0-9_-]+$")
+_AI_DEV_RE = re.compile(r"^(libcudnn[0-9]*(-dev)?|libnvinfer[0-9]*(-dev)?|tensorrt[a-zA-Z0-9_-]*|nvidia-prime)$")
 _VERSION_RE = re.compile(r"^[0-9][A-Za-z0-9.+~:-]*$")
 
 
@@ -298,8 +308,13 @@ def _is_allowed_package(name):
     if sep:
         if not ver or not _VERSION_RE.match(ver):
             return False
-        return bool(_NVIDIA_DRIVER_RE.match(pkg) or _AI_DEV_RE.match(pkg))
-    if name == nouveau:
+        return bool(
+            _NVIDIA_DRIVER_RE.match(pkg)
+            or _AI_DEV_RE.match(pkg)
+            or _LINUX_HEADERS_RE.match(pkg)
+            or pkg in _NVIDIA_EXTRA_PKGS
+        )
+    if name == nouveau or name in _NVIDIA_EXTRA_PKGS:
         return True
     if _LINUX_HEADERS_RE.match(name) or _NVIDIA_DRIVER_RE.match(name) or _AI_DEV_RE.match(name):
         return True
@@ -377,13 +392,6 @@ def install_nvidia(packages):
             return False
     mark_need_reboot()
     return True
-
-
-_NVIDIA_EXTRA_PKGS = (
-    "xserver-xorg-video-nvidia",
-    "libgl1-nvidia-glvnd-glx",
-    "glx-alternative-nvidia",
-)
 
 
 def _nvidia_stack_packages():
@@ -537,7 +545,6 @@ def set_prime_mode(mode: str):
 
 
 def shutil_which(cmd):
-    import shutil
     return shutil.which(cmd)
 
 
@@ -563,6 +570,17 @@ def install_ai_tools(requested_pkgs=None):
     return False
 
 
+def _get_cache_path(filename: str) -> str:
+    try:
+        if os.access("/var/cache", os.W_OK):
+            return os.path.join("/var/cache", filename)
+    except Exception:
+        pass
+    user_cache = os.path.expanduser("~/.cache/parslinux-nvidia-installer")
+    os.makedirs(user_cache, exist_ok=True)
+    return os.path.join(user_cache, filename)
+
+
 FAN_SPEED_CACHE = "/var/cache/parslinux-nvi-fan-speed"
 POWER_LIMIT_CACHE = "/var/cache/parslinux-nvi-power-limit"
 GAME_OFFLOAD_CONF = "/etc/environment.d/10-parslinux-nvidia-games.conf"
@@ -577,8 +595,9 @@ def set_fan_speed(percent: int):
     except (ValueError, TypeError):
         return False
 
-    os.makedirs(os.path.dirname(FAN_SPEED_CACHE), exist_ok=True)
-    with open(FAN_SPEED_CACHE, "w") as f:
+    cache_path = _get_cache_path("parslinux-nvi-fan-speed")
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    with open(cache_path, "w") as f:
         f.write(str(val) + "\n")
 
     settings_bin = shutil_which("nvidia-settings")
@@ -604,8 +623,9 @@ def set_power_limit(watts: int):
     except (ValueError, TypeError):
         return False
 
-    os.makedirs(os.path.dirname(POWER_LIMIT_CACHE), exist_ok=True)
-    with open(POWER_LIMIT_CACHE, "w") as f:
+    cache_path = _get_cache_path("parslinux-nvi-power-limit")
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    with open(cache_path, "w") as f:
         f.write(str(val) + "\n")
 
     smi_bin = shutil_which("nvidia-smi")
@@ -642,6 +662,100 @@ def set_game_offload(state: str):
     return True
 
 
+def set_gpu_overclock(core_offset: int, mem_offset: int):
+    """
+    Sets GPU core clock and memory transfer rate offsets (MHz).
+    Safe ranges:
+    - Core offset: -300 to +400 MHz
+    - Memory offset: -1000 to +2000 MHz
+    """
+    try:
+        core_offset = int(core_offset)
+        mem_offset = int(mem_offset)
+    except (ValueError, TypeError):
+        print("set_gpu_overclock: offsets must be integers", file=sys.stderr)
+        return False
+
+    if not (-300 <= core_offset <= 400):
+        print(f"set_gpu_overclock: core offset {core_offset} out of safe range [-300..400]", file=sys.stderr)
+        return False
+
+    if not (-1000 <= mem_offset <= 2000):
+        print(f"set_gpu_overclock: memory offset {mem_offset} out of safe range [-1000..2000]", file=sys.stderr)
+        return False
+
+    core_path = _get_cache_path("parslinux-nvi-oc-core")
+    mem_path = _get_cache_path("parslinux-nvi-oc-mem")
+    try:
+        with open(core_path, "w") as f:
+            f.write(str(core_offset))
+        with open(mem_path, "w") as f:
+            f.write(str(mem_offset))
+    except OSError as e:
+        print(f"set_gpu_overclock cache write failed: {e}", file=sys.stderr)
+
+    # Apply via nvidia-settings if available and display accessible
+    if shutil.which("nvidia-settings"):
+        env = os.environ.copy()
+        if "DISPLAY" not in env:
+            env["DISPLAY"] = ":0"
+        try:
+            subprocess.call(
+                ["nvidia-settings", "-a", f"[gpu:0]/GPUGraphicsClockOffsetAllPerformanceLevels={core_offset}"],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            subprocess.call(
+                ["nvidia-settings", "-a", f"[gpu:0]/GPUMemoryTransferRateOffsetAllPerformanceLevels={mem_offset}"],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
+
+    print(f"GPU Overclock offsets applied: Core {core_offset:+d} MHz, Memory {mem_offset:+d} MHz")
+    return True
+
+
+def create_timeshift_snapshot(comment: str = "ParsLinux NVIDIA Driver Backup"):
+    """
+    Creates a system restore snapshot using Timeshift.
+    """
+    safe_comment = re.sub(r"[^a-zA-Z0-9 _.-]", "", str(comment))[:80].strip() or "ParsLinux NVIDIA Backup"
+    timeshift_bin = shutil.which("timeshift") or "/usr/bin/timeshift"
+    if not os.path.isfile(timeshift_bin):
+        print("create_timeshift_snapshot: timeshift is not installed on system", file=sys.stderr)
+        return False
+
+    cmd = [timeshift_bin, "--create", "--comments", safe_comment, "--tags", "D"]
+    print(f"Executing: {' '.join(cmd)}")
+    rc = subprocess.call(cmd)
+    return rc == 0
+
+
+def install_extra_package(pkg_name: str):
+    """
+    Installs an authorized extra gaming/utility package (e.g. mangohud, timeshift).
+    """
+    if pkg_name not in _NVIDIA_EXTRA_PKGS:
+        print(f"install_extra_package: package {pkg_name} is not whitelisted", file=sys.stderr)
+        return False
+
+    if HAS_APT or shutil.which("apt-get"):
+        cmd = ["apt-get", "install", "-yq", "--", pkg_name]
+    elif shutil.which("pacman"):
+        cmd = ["pacman", "-S", "--needed", "--noconfirm", pkg_name]
+    else:
+        print("install_extra_package: no supported package manager found", file=sys.stderr)
+        return False
+
+    print(f"Executing: {' '.join(cmd)}")
+    rc = subprocess.call(cmd)
+    return rc == 0
+
+
 if __name__ == "__main__":
     args = sys.argv
     if len(args) <= 1:
@@ -669,6 +783,16 @@ if __name__ == "__main__":
     elif param1 == "set-game-offload":
         st = args[2] if len(args) > 2 else "on"
         ok = set_game_offload(st)
+    elif param1 == "set-overclock":
+        c_off = int(args[2]) if len(args) > 2 else 0
+        m_off = int(args[3]) if len(args) > 3 else 0
+        ok = set_gpu_overclock(c_off, m_off)
+    elif param1 == "create-snapshot":
+        comment = args[2] if len(args) > 2 else "ParsLinux NVIDIA Driver Backup"
+        ok = create_timeshift_snapshot(comment)
+    elif param1 == "install-extra":
+        pkg = args[2] if len(args) > 2 else "mangohud"
+        ok = install_extra_package(pkg)
     elif param1 == "install-ai-tools":
         pkgs_arg = args[2:] if len(args) > 2 else ["nvidia-cuda-toolkit"]
         ok = install_ai_tools(pkgs_arg)

@@ -55,6 +55,7 @@ data_files = [
     ("/usr/share/parslinux/parslinux-nvidia-installer/src", [
         "src/Main.py",
         "src/MainWindow.py",
+        "src/detector.py",
         "src/monitor.py",
         "src/tray.py",
         "src/nvidia.py",
@@ -66,7 +67,8 @@ data_files = [
         "ui/driver_toggle.glade"
     ]),
     ("/usr/share/parslinux/parslinux-nvidia-installer/data", [
-        "data/nvidia-pci.json"
+        "data/nvidia-pci.json",
+        "data/style.css"
     ]),
     ("/usr/share/parslinux/parslinux-nvidia-installer/data/assets", [
         "data/assets/nouveau_logo.png",

@@ -165,3 +165,13 @@ class NvidiaTrayIndicator:
 def run_tray_indicator(on_open_callback=None):
     indicator = NvidiaTrayIndicator(on_open_callback)
     return indicator
+
+
+def main():
+    ind = run_tray_indicator()
+    loop = GLib.MainLoop()
+    loop.run()
+
+
+if __name__ == "__main__":
+    main()

@@ -26,7 +26,11 @@ else:
 if app_src not in sys.path:
     sys.path.insert(0, app_src)
 
-os.chdir(app_src)
+if "-t" in sys.argv or "--tray" in sys.argv:
+    tray_py = os.path.join(app_src, "tray.py")
+    if os.path.isfile(tray_py):
+        import subprocess
+        sys.exit(subprocess.call([sys.executable, tray_py]))
 
 try:
     import Main

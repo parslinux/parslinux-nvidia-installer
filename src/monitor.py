@@ -253,3 +253,95 @@ def get_detected_game_launchers():
         })
     return launchers
 
+
+def get_mangohud_status():
+    """
+    Returns MangoHud status: installed, enabled, config_path.
+    """
+    installed = bool(shutil.which("mangohud"))
+    conf_path = os.path.expanduser("~/.config/MangoHud/MangoHud.conf")
+    enabled = os.path.isfile(conf_path)
+    return {
+        "installed": installed,
+        "enabled": enabled,
+        "conf_path": conf_path,
+    }
+
+
+def set_mangohud_profile(enabled: bool):
+    """
+    Enables or disables ParsLinux custom gaming HUD profile for MangoHud.
+    """
+    conf_dir = os.path.expanduser("~/.config/MangoHud")
+    conf_path = os.path.join(conf_dir, "MangoHud.conf")
+    if enabled:
+        os.makedirs(conf_dir, exist_ok=True)
+        content = (
+            "### ParsLinux Gaming HUD Profile ###\n"
+            "fps\n"
+            "fps_limit=0\n"
+            "gpu_stats\n"
+            "gpu_temp\n"
+            "gpu_core_clock\n"
+            "gpu_mem_clock\n"
+            "gpu_power\n"
+            "vram\n"
+            "cpu_stats\n"
+            "cpu_temp\n"
+            "ram\n"
+            "frame_timing=1\n"
+            "gamemode\n"
+            "position=top-left\n"
+            "round_corners=8\n"
+            "background_alpha=0.65\n"
+            "font_size=20\n"
+            "toggle_hud=Shift_R+F12\n"
+        )
+        try:
+            with open(conf_path, "w") as f:
+                f.write(content)
+            return True
+        except OSError:
+            return False
+    else:
+        if os.path.isfile(conf_path):
+            try:
+                os.remove(conf_path)
+            except OSError:
+                pass
+        return True
+
+
+def _read_cache_int(filename: str) -> int:
+    for candidate in (
+        os.path.join("/var/cache", filename),
+        os.path.expanduser(f"~/.cache/parslinux-nvidia-installer/{filename}"),
+    ):
+        if os.path.isfile(candidate):
+            try:
+                with open(candidate, "r") as f:
+                    return int(f.read().strip())
+            except (ValueError, OSError):
+                pass
+    return 0
+
+
+def get_overclock_settings():
+    """
+    Returns configured GPU core and memory clock offsets (MHz).
+    """
+    core = _read_cache_int("parslinux-nvi-oc-core")
+    mem = _read_cache_int("parslinux-nvi-oc-mem")
+    return {
+        "core_offset": core,
+        "mem_offset": mem,
+        "is_active": core != 0 or mem != 0,
+    }
+
+
+def is_timeshift_installed():
+    """
+    Checks if Timeshift system backup utility is available.
+    """
+    return bool(shutil.which("timeshift"))
+

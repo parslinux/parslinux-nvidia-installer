@@ -3,12 +3,30 @@
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE)
 [![ParsLinux](https://img.shields.io/badge/ParsLinux-Ecosystem-orange.svg)](https://parslinux.org)
 [![Python 3](https://img.shields.io/badge/Python-3.8+-green.svg)](https://www.python.org/)
-[![GTK 3](https://img.shields.io/badge/GUI-GTK%203-blue.svg)](https://www.gtk.org/)
+[![GTK 4](https://img.shields.io/badge/GUI-GTK%204-blue.svg)](https://www.gtk.org/)
 [![Version](https://img.shields.io/badge/Version-1.2.0-brightgreen.svg)](docs/VERSION.md)
 
 **ParsLinux Nvidia Installer**, ParsLinux işletim sisteminde resmi NVIDIA grafik sürücülerini tek tıkla kurmayı, güncellemeyi, donanım telemetrisini canlı izlemeyi, fan ve güç limitlerini ayarlamayı, oyun hızlandırmayı ve yapay zeka/CUDA ortamını yapılandırmayı sağlayan modern bir grafiksel sistem merkezidir.
 
 Pardus projesinin `pardus-nvidia-installer` aracından forklanarak ParsLinux mimarisine, çoklu dağıtım paketleme sistemine ve ParsLinux görsel kimliğine uyarlanmış; üzerine telemetri, güç yönetimi, oyun hızlandırıcı ve sistem tepsisi katmanları eklenmiştir.
+
+<p align="center">
+  <img src="images/screenshot.png" alt="ParsLinux Nvidia Installer Hero Screenshot" width="750" />
+</p>
+
+---
+
+## 📸 Ekran Görüntüleri
+
+| 🎮 Sürücüler & Otomatik Tavsiye | 📊 Donanım İzleme, Güç & Fan |
+|:---:|:---:|
+| <img src="images/screenshot_drivers.png" width="380" alt="Sürücü Yönetimi" /> | <img src="images/screenshot_monitor.png" width="380" alt="Donanım İzleme & Güç" /> |
+| **Kart tespiti, önerilen sürücü & tek tık kurulum** | **Canlı sensörler, PRIME profilleri, Fan/Güç & OC** |
+
+| 🕹️ Oyun Hızlandırıcı & HUD | 🧠 Yapay Zeka & CUDA Ortamı |
+|:---:|:---:|
+| <img src="images/screenshot_gaming.png" width="380" alt="Oyun Hızlandırıcı" /> | <img src="images/screenshot_ai.png" width="380" alt="Yapay Zeka & CUDA" /> |
+| **PRIME Offload, Steam/Lutris optimizasyonu & MangoHud** | **CUDA Toolkit, cuDNN ve TensorRT entegrasyonu** |
 
 ---
 
@@ -37,7 +55,7 @@ Pardus projesinin `pardus-nvidia-installer` aracından forklanarak ParsLinux mim
 | Bileşen | Paket Adı (Debian / ParsLinux) | Paket Adı (Arch Linux / CachyOS) |
 |---|---|---|
 | **Python** | `python3` (3.8+) | `python` |
-| **GObject Introspection** | `python3-gi`, `gir1.2-gtk-3.0` | `python-gobject`, `gtk3` |
+| **GObject Introspection** | `python3-gi`, `gir1.2-gtk-4.0` | `python-gobject`, `gtk4` |
 | **Terminal Bileşeni** | `gir1.2-vte-2.91` | `vte3` |
 | **Sistem Tepsisi** | `gir1.2-ayatanaappindicator3-0.1` | `libayatana-appindicator` |
 | **Yetkilendirme (Polkit)** | `gir1.2-polkit-1.0`, `policykit-1` | `polkit` |

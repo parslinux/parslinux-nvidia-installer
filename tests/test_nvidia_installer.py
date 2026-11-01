@@ -71,6 +71,9 @@ class TestPackageSecurity(unittest.TestCase):
         self.assertTrue(package._is_allowed_package("nvidia-tesla-470-driver"))
         self.assertTrue(package._is_allowed_package("nvidia-driver=550.120-1"))
         self.assertTrue(package._is_allowed_package("linux-headers-6.6.0-pars-amd64"))
+        self.assertTrue(package._is_allowed_package("xserver-xorg-video-nvidia"))
+        self.assertTrue(package._is_allowed_package("libgl1-nvidia-glvnd-glx"))
+        self.assertTrue(package._is_allowed_package("glx-alternative-nvidia"))
 
     def test_rejected_unsafe_package_names(self):
         # Prevent option injection or path traversal
@@ -148,6 +151,46 @@ class TestMonitorAndTelemetry(unittest.TestCase):
         offload_status = monitor.get_game_offload_status()
         self.assertIsInstance(offload_status, bool)
 
+    def test_mangohud_profile_configuration(self):
+        import monitor
+        status = monitor.get_mangohud_status()
+        self.assertIn("installed", status)
+        self.assertIn("enabled", status)
+
+        # Test enabling and disabling profile
+        ok = monitor.set_mangohud_profile(True)
+        self.assertTrue(ok)
+        self.assertTrue(monitor.get_mangohud_status()["enabled"])
+
+        # Revert
+        monitor.set_mangohud_profile(False)
+        self.assertFalse(monitor.get_mangohud_status()["enabled"])
+
+    def test_overclock_settings_and_validation(self):
+        import monitor
+        self.assertFalse(package.set_gpu_overclock(-500, 0))
+        self.assertFalse(package.set_gpu_overclock(600, 0))
+        self.assertFalse(package.set_gpu_overclock(0, -2000))
+        self.assertFalse(package.set_gpu_overclock(0, 3000))
+        self.assertFalse(package.set_gpu_overclock("invalid", "offset"))
+
+        # Test safe ranges
+        self.assertTrue(package.set_gpu_overclock(50, 100))
+        oc = monitor.get_overclock_settings()
+        self.assertEqual(oc["core_offset"], 50)
+        self.assertEqual(oc["mem_offset"], 100)
+        self.assertTrue(oc["is_active"])
+
+        # Reset
+        self.assertTrue(package.set_gpu_overclock(0, 0))
+
+    def test_timeshift_helpers_and_package_whitelisting(self):
+        import monitor
+        self.assertIsInstance(monitor.is_timeshift_installed(), bool)
+        self.assertTrue(package._is_allowed_package("mangohud"))
+        self.assertTrue(package._is_allowed_package("timeshift"))
+        self.assertTrue(package._is_allowed_package("goverlay"))
+
     def test_tray_module_initialization(self):
         import tray
         ind = tray.run_tray_indicator()
@@ -190,6 +233,143 @@ class TestMetadataAndFiles(unittest.TestCase):
             tree = ET.parse(path)
             self.assertEqual(tree.getroot().tag, "interface")
 
+    def test_gtk4_ui_validation(self):
+        import subprocess
+        for glade in ("ui/ui.glade", "ui/driver_toggle.glade"):
+            path = os.path.join(PROJECT_DIR, glade)
+            res = subprocess.run(["gtk4-builder-tool", "validate", path], capture_output=True, text=True)
+            self.assertEqual(res.returncode, 0, f"GTK4 validation failed for {glade}: {res.stderr}")
+
+    def test_gtk4_app_launch_simulated(self):
+        import subprocess
+        cmd = [
+            sys.executable,
+            "-c",
+            "import os, sys; sys.path.insert(0, 'src'); os.environ['PARSLINUX_NVI_DEBUG']='1'; import Main, MainWindow; app = Main.Application(); win = MainWindow.MainWindow(app); sys.exit(0 if win.ui_main_window is not None else 1)"
+        ]
+        res = subprocess.run(cmd, cwd=PROJECT_DIR, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"GTK4 application failed to launch: {res.stderr}")
+
+
+class TestAutoDetectionSystem(unittest.TestCase):
+    def test_detect_all_system_gpus(self):
+        import detector
+        gpus = detector.detect_all_system_gpus()
+        self.assertIsInstance(gpus, list)
+        self.assertGreater(len(gpus), 0)
+        gpu = gpus[0]
+        self.assertIn("pci_slot", gpu)
+        self.assertIn("vendor_id", gpu)
+        self.assertIn("device_id", gpu)
+        self.assertIn("device_name", gpu)
+        self.assertIn("is_primary", gpu)
+        self.assertIn("is_nvidia", gpu)
+
+    def test_identify_architectures(self):
+        import detector
+        # Blackwell
+        arch, _, pkg, _ = detector.identify_architecture(0x2900, "GeForce RTX 5090")
+        self.assertEqual(arch, "Blackwell")
+        self.assertEqual(pkg, "nvidia-driver")
+
+        # Ada Lovelace
+        arch, _, pkg, _ = detector.identify_architecture(0x2782, "GeForce RTX 4070 Ti")
+        self.assertEqual(arch, "Ada Lovelace")
+        self.assertEqual(pkg, "nvidia-driver")
+
+        # Ampere
+        arch, _, pkg, _ = detector.identify_architecture(0x2503, "GeForce RTX 3060")
+        self.assertEqual(arch, "Ampere")
+        self.assertEqual(pkg, "nvidia-driver")
+
+        # Turing
+        arch, _, pkg, _ = detector.identify_architecture(0x2184, "GeForce GTX 1660")
+        self.assertEqual(arch, "Turing")
+        self.assertEqual(pkg, "nvidia-driver")
+
+        # Pascal
+        arch, _, pkg, _ = detector.identify_architecture(0x1B81, "GeForce GTX 1070")
+        self.assertEqual(arch, "Pascal")
+        self.assertEqual(pkg, "nvidia-driver")
+
+        # Kepler (Legacy 470)
+        arch, _, pkg, _ = detector.identify_architecture(0x1187, "GeForce GTX 760")
+        self.assertEqual(arch, "Kepler")
+        self.assertEqual(pkg, "nvidia-tesla-470-driver")
+
+        # Fermi (Legacy 390)
+        arch, _, pkg, _ = detector.identify_architecture(0x0DC4, "GeForce GTS 450")
+        self.assertEqual(arch, "Fermi")
+        self.assertEqual(pkg, "nvidia-legacy-390xx-driver")
+
+    def test_driver_tag_recommendation(self):
+        import detector
+        drivers_list = [
+            nvidia.NvidiaDriver("xserver-xorg-video-nouveau", "1.0.17", "Open Source", "Debian", False),
+            nvidia.NvidiaDriver("nvidia-driver", "550.120", "Proprietary", "NVIDIA", False),
+            nvidia.NvidiaDriver("nvidia-tesla-470-driver", "470.256", "Legacy", "Debian", False),
+        ]
+        # Simulate an Ampere GPU
+        dev = nvidia.NvidiaDevice(
+            vendor_id=0x10DE,
+            vendor_name="NVIDIA Corporation",
+            device_id=0x2503,
+            device_name="GeForce RTX 3060",
+            architecture="Ampere",
+            recommended_driver="nvidia-driver",
+            recommendation_reason="Ampere mimarisi için önerilmektedir",
+        )
+        rec = detector.tag_recommended_driver(drivers_list, [dev])
+        self.assertIsNotNone(rec)
+        self.assertEqual(rec.package, "nvidia-driver")
+        self.assertTrue(rec.is_recommended)
+        self.assertIn("Ampere", rec.recommendation_reason)
+
+    def test_kepler_driver_tag_recommendation(self):
+        import detector
+        drivers_list = [
+            nvidia.NvidiaDriver("xserver-xorg-video-nouveau", "1.0.17", "Open Source", "Debian", False),
+            nvidia.NvidiaDriver("nvidia-driver", "550.120", "Proprietary", "NVIDIA", False),
+            nvidia.NvidiaDriver("nvidia-tesla-470-driver", "470.256", "Legacy", "Debian", False),
+        ]
+        # Simulate a Kepler GPU
+        dev = nvidia.NvidiaDevice(
+            vendor_id=0x10DE,
+            vendor_name="NVIDIA Corporation",
+            device_id=0x1187,
+            device_name="GeForce GTX 760",
+            architecture="Kepler",
+            recommended_driver="nvidia-tesla-470-driver",
+            recommendation_reason="Kepler mimarisi için 470 sürücüsü önerilmektedir",
+        )
+        rec = detector.tag_recommended_driver(drivers_list, [dev])
+        self.assertIsNotNone(rec)
+        self.assertEqual(rec.package, "nvidia-tesla-470-driver")
+        self.assertTrue(rec.is_recommended)
+
+    def test_hardware_report(self):
+        import detector
+        report = detector.generate_hardware_report()
+        self.assertIn("ParsLinux Donanım & GPU Otomatik Algılama Raporu", report)
+        self.assertIn("GPU #1", report)
+
+    def test_nvidia_module_recommendation_integration(self):
+        os.environ["PARSLINUX_NVI_DEBUG"] = "1"
+        try:
+            gpus = nvidia.graphics()
+            self.assertGreater(len(gpus), 0)
+            gpu = gpus[0]
+            self.assertIsNotNone(gpu.architecture)
+            self.assertIsNotNone(gpu.recommended_driver)
+
+            drvs = nvidia.drivers(gpus)
+            recommended_drvs = [d for d in drvs if getattr(d, "is_recommended", False)]
+            self.assertEqual(len(recommended_drvs), 1)
+            self.assertEqual(recommended_drvs[0].package, "nvidia-driver")
+        finally:
+            os.environ.pop("PARSLINUX_NVI_DEBUG", None)
+
 
 if __name__ == "__main__":
     unittest.main()
+

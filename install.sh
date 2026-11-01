@@ -63,8 +63,8 @@ if [ "$NO_DEPS" = false ]; then
         sudo apt-get install -y \
             python3 \
             python3-gi \
-            gir1.2-gtk-3.0 \
-            gir1.2-vte-2.91 \
+            gir1.2-gtk-4.0 \
+            gir1.2-vte-3.91 \
             gir1.2-polkit-1.0 \
             python3-apt \
             pciutils \
@@ -75,15 +75,15 @@ if [ "$NO_DEPS" = false ]; then
         sudo pacman -S --needed --noconfirm \
             python \
             python-gobject \
-            gtk3 \
-            vte3 \
+            gtk4 \
+            vte4 \
             polkit \
             hwdata \
             gnupg \
             gettext \
             python-setuptools
     else
-        echo -e "${YELLOW}Unknown package manager. Please ensure Python 3, GTK 3, VTE, and Polkit are installed.${NC}"
+        echo -e "${YELLOW}Unknown package manager. Please ensure Python 3, GTK 4, VTE 4, and Polkit are installed.${NC}"
     fi
 fi
 

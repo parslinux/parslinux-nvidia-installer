@@ -23,6 +23,7 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  -h, --help       Show this help message"
+    echo "  --detect, -d     Auto-detect graphics hardware and print diagnostic report"
     echo "  --debug, -g      Run in debug / simulated hardware mode"
     echo "  --system         Run system-installed version instead of local dev source"
     echo "  --test           Run automated test suite"
@@ -30,6 +31,7 @@ show_help() {
     echo ""
     echo "Examples:"
     echo "  ./run.sh                 # Auto-detects GPUs or falls back to debug on VM/non-Nvidia"
+    echo "  ./run.sh --detect        # Auto-detect GPU hardware and print full report"
     echo "  ./run.sh --debug         # Force simulated NVIDIA RTX GPU for UI demonstration"
     echo "  ./run.sh --system        # Run installed system binary"
     echo "  ./run.sh --test          # Run automated tests"
@@ -38,6 +40,11 @@ show_help() {
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     show_help
     exit 0
+fi
+
+if [[ "$1" == "--detect" || "$1" == "-d" ]]; then
+    shift
+    exec ./parslinux-nvidia-installer --detect "$@"
 fi
 
 if [[ "$1" == "--test" ]]; then

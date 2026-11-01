@@ -9,8 +9,8 @@ license=('GPL-3.0-or-later')
 depends=(
     'python'
     'python-gobject'
-    'gtk3'
-    'vte3'
+    'gtk4'
+    'vte4'
     'polkit'
     'hwdata'
     'gnupg'

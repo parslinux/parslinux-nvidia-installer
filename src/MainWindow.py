@@ -13,16 +13,68 @@ import shutil
 import locale
 import platform
 
+import detector
 import monitor
 import nvidia
 import package
 
-gi.require_version("Gtk", "3.0")
+gi.require_version("Gtk", "4.0")
 gi.require_version("Polkit", "1.0")
-gi.require_version("Vte", "2.91")
+gi.require_version("Vte", "3.91")
 
 from gi.repository import Gtk, GObject, GLib, Vte, Gdk, GdkPixbuf
 from locale import gettext as _
+
+# GTK4 Box / ScrolledWindow / Widget compatibility helpers
+if not hasattr(Gtk.Box, "pack_start"):
+    def _box_pack_start(self, child, expand=False, fill=False, padding=0):
+        if expand:
+            if self.get_orientation() == Gtk.Orientation.HORIZONTAL:
+                child.set_hexpand(True)
+            else:
+                child.set_vexpand(True)
+        self.append(child)
+    Gtk.Box.pack_start = _box_pack_start
+
+if not hasattr(Gtk.Box, "pack_end"):
+    def _box_pack_end(self, child, expand=False, fill=False, padding=0):
+        if expand:
+            if self.get_orientation() == Gtk.Orientation.HORIZONTAL:
+                child.set_hexpand(True)
+            else:
+                child.set_vexpand(True)
+        self.append(child)
+    Gtk.Box.pack_end = _box_pack_end
+
+if not hasattr(Gtk.Box, "reorder_child"):
+    def _box_reorder_child(self, child, position):
+        if position <= 0:
+            self.reorder_child_after(child, None)
+        else:
+            cur = self.get_first_child()
+            idx = 0
+            sibling = None
+            while cur:
+                if cur != child:
+                    if idx == position - 1:
+                        sibling = cur
+                        break
+                    idx += 1
+                cur = cur.get_next_sibling()
+            self.reorder_child_after(child, sibling)
+    Gtk.Box.reorder_child = _box_reorder_child
+
+if not hasattr(Gtk.ScrolledWindow, "add"):
+    Gtk.ScrolledWindow.add = lambda self, child: self.set_child(child)
+
+if hasattr(Gtk, "CenterBox") and not hasattr(Gtk.CenterBox, "pack_start"):
+    Gtk.CenterBox.pack_start = lambda self, child, expand=False, fill=False, padding=0: self.set_center_widget(child)
+
+if not hasattr(Gtk.Label, "set_line_wrap"):
+    Gtk.Label.set_line_wrap = lambda self, wrap: self.set_wrap(wrap)
+
+if not hasattr(Gtk.Widget, "show_all"):
+    Gtk.Widget.show_all = lambda self: self.set_visible(True)
 
 APPNAME_CODE = "parslinux-nvidia-installer"
 TRANSLATIONS_PATH = "/usr/share/locale/"
@@ -62,16 +114,16 @@ def check_is_reboot_pending():
 
 def get_system_gpu_description():
     try:
-        out = subprocess.check_output(["lspci"], text=True, stderr=subprocess.DEVNULL)
-        for line in out.splitlines():
-            line_lower = line.lower()
-            if any(term in line_lower for term in ("vga compatible", "3d controller", "display controller")):
-                parts = line.split(":", 2)
-                if len(parts) >= 3:
-                    return parts[2].strip()
+        gpus = detector.detect_all_system_gpus()
+        if gpus:
+            desc_items = []
+            for g in gpus:
+                role = _("Birincil") if g.get("is_primary") else _("Harici/İkincil")
+                desc_items.append(f"{g.get('device_name')} ({role})")
+            return " + ".join(desc_items)
     except Exception:
         pass
-    return "Intel / AMD Grafik Bağdaştırıcısı"
+    return _("Intel / AMD Grafik Bağdaştırıcısı")
 
 
 def apply_custom_css():
@@ -80,28 +132,34 @@ def apply_custom_css():
         css_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "../data/style.css"))
         if os.path.isfile(css_path):
             css_provider.load_from_path(css_path)
-            screen = Gdk.Screen.get_default()
-            if screen:
-                Gtk.StyleContext.add_provider_for_screen(
-                    screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            display = Gdk.Display.get_default()
+            if display:
+                Gtk.StyleContext.add_provider_for_display(
+                    display, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
                 )
     except Exception as e:
         print(f"Warning: Failed to load style.css: {e}", file=sys.stderr)
 
 
 class MainWindow(object):
+    @staticmethod
+    def _build_ui_file(file_path):
+        assets_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "../data/assets"))
+        if not os.path.isdir(assets_dir):
+            assets_dir = "/usr/share/parslinux/parslinux-nvidia-installer/data/assets"
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            content = content.replace("../data/assets", assets_dir)
+            return Gtk.Builder.new_from_string(content, len(content.encode("utf-8")))
+        except Exception as e:
+            print(f"Failed to load UI from {file_path}: {e}", file=sys.stderr)
+            sys.exit(1)
+
     def __init__(self, application):
         self.application = application
         self.ui_interface_file = os.path.join(os.path.dirname(__file__), "../ui/ui.glade")
-        try:
-            self.gtk_builder = Gtk.Builder.new_from_file(self.ui_interface_file)
-            self.gtk_builder.connect_signals(self)
-        except GLib.Error as e:
-            print(
-                f"Failed to load UI from {self.ui_interface_file}: {e}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+        self.gtk_builder = self._build_ui_file(self.ui_interface_file)
 
         apply_custom_css()
 
@@ -116,7 +174,7 @@ class MainWindow(object):
         if check_is_reboot_pending():
             self.ui_main_window = self.get_ui("ui_window_reboot")
             self.ui_main_window.set_application(application)
-            self.ui_main_window.show_all()
+            self.ui_main_window.present()
             return
 
         self.driver_buttons = []
@@ -160,11 +218,13 @@ class MainWindow(object):
         except Exception:
             pass
         # Configure icon search path so named icons resolve locally
-        icon_theme = Gtk.IconTheme.get_default()
-        if icon_theme:
-            icon_theme.append_search_path(os.path.normpath(os.path.join(os.path.dirname(__file__), "../images")))
-            icon_theme.append_search_path(os.path.normpath(os.path.join(os.path.dirname(__file__), "..")))
-            icon_theme.append_search_path(os.path.normpath(os.path.join(os.path.dirname(__file__), "../data/assets")))
+        display = Gdk.Display.get_default()
+        if display:
+            icon_theme = Gtk.IconTheme.get_for_display(display)
+            if icon_theme:
+                icon_theme.add_search_path(os.path.normpath(os.path.join(os.path.dirname(__file__), "../images")))
+                icon_theme.add_search_path(os.path.normpath(os.path.join(os.path.dirname(__file__), "..")))
+                icon_theme.add_search_path(os.path.normpath(os.path.join(os.path.dirname(__file__), "../data/assets")))
 
         # Load ParsLinux logo pixbuf directly
         logo_paths = [
@@ -186,11 +246,14 @@ class MainWindow(object):
             self.ui_about_dialog.set_version(version)
             self.ui_about_dialog.set_program_name("ParsLinux Nvidia Installer")
             self.ui_about_dialog.set_website("https://parslinux.org")
-            if self.app_icon_pixbuf:
-                self.ui_about_dialog.set_logo(self.app_icon_pixbuf)
+            if self.app_icon_pixbuf and hasattr(self.ui_about_dialog, "set_logo"):
+                try:
+                    self.ui_about_dialog.set_logo(self.app_icon_pixbuf)
+                except Exception:
+                    pass
 
-        if self.ui_main_window and self.app_icon_pixbuf:
-            self.ui_main_window.set_icon(self.app_icon_pixbuf)
+        if self.ui_main_window:
+            self.ui_main_window.set_icon_name("parslinux-nvidia-installer")
 
         self.ui_info_dialog = self.get_ui("ui_info_dialog")
         self.ui_about_button.connect("clicked", self.on_about_button_clicked)
@@ -203,7 +266,7 @@ class MainWindow(object):
         self.ui_nvidia_box = self.get_ui("ui_nvidia_box")
         self.ui_novidia_box = self.get_ui("ui_novidia_box")
         self.ui_disable_check_button.connect(
-            "clicked", self.on_disable_checkbox_checked
+            "toggled", self.on_disable_checkbox_checked
         )
         self.ui_enable_button = self.get_ui("ui_enable_button")
         self.ui_enable_button.connect("clicked", self.on_enable_button_clicked)
@@ -212,6 +275,45 @@ class MainWindow(object):
         self.ui_btn_simulate = self.get_ui("ui_btn_simulate")
         if self.ui_btn_simulate:
             self.ui_btn_simulate.connect("clicked", self.on_simulate_clicked)
+
+        # Build dynamic hardware auto-detection toolbar in no-nvidia page
+        if self.ui_novidia_box:
+            novidia_btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            novidia_btn_box.set_halign(Gtk.Align.CENTER)
+
+            btn_rescan_novidia = Gtk.Button.new_with_label(_("🔄 Donanımı Yeniden Tara"))
+            btn_rescan_novidia.get_style_context().add_class("rescan-btn")
+            btn_rescan_novidia.connect("clicked", lambda b: self.on_rescan_hardware())
+            novidia_btn_box.pack_start(btn_rescan_novidia, False, False, 0)
+
+            btn_diag_novidia = Gtk.Button.new_with_label(_("🔍 Donanım Raporunu Görüntüle"))
+            btn_diag_novidia.get_style_context().add_class("diag-btn")
+            btn_diag_novidia.connect("clicked", lambda b: self.on_show_hardware_diagnostics())
+            novidia_btn_box.pack_start(btn_diag_novidia, False, False, 0)
+
+            self.ui_novidia_box.pack_start(novidia_btn_box, False, False, 4)
+
+            # Architecture test presets
+            lbl_sim_presets = Gtk.Label()
+            lbl_sim_presets.set_markup('<span font_size="small" foreground="#64748B"><b>Otomatik Algılama Simülatörü:</b></span>')
+            self.ui_novidia_box.pack_start(lbl_sim_presets, False, False, 2)
+
+            preset_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            preset_box.set_halign(Gtk.Align.CENTER)
+
+            btn_ada = Gtk.Button.new_with_label("RTX 4070 Ti (Ada)")
+            btn_ada.connect("clicked", lambda b: self.on_simulate_custom_gpu("ada"))
+            preset_box.pack_start(btn_ada, False, False, 0)
+
+            btn_amp = Gtk.Button.new_with_label("RTX 3060 (Ampere)")
+            btn_amp.connect("clicked", lambda b: self.on_simulate_custom_gpu("ampere"))
+            preset_box.pack_start(btn_amp, False, False, 0)
+
+            btn_kep = Gtk.Button.new_with_label("GTX 760 (Kepler Legacy)")
+            btn_kep.connect("clicked", lambda b: self.on_simulate_custom_gpu("kepler"))
+            preset_box.pack_start(btn_kep, False, False, 0)
+
+            self.ui_novidia_box.pack_start(preset_box, False, False, 4)
 
         self.ui_detected_gpu_label = self.get_ui("ui_detected_gpu_label")
         if self.ui_detected_gpu_label:
@@ -239,8 +341,11 @@ class MainWindow(object):
         self.update_vte_color(self.vte)
         self.ui_box_vte = self.get_ui("ui_box_vte")
         vte_scrolled = Gtk.ScrolledWindow()
-        vte_scrolled.add(self.vte)
-        self.ui_box_vte.pack_start(vte_scrolled, True, True, 0)
+        vte_scrolled.set_child(self.vte)
+        if hasattr(self.ui_box_vte, "set_center_widget"):
+            self.ui_box_vte.set_center_widget(vte_scrolled)
+        else:
+            self.ui_box_vte.pack_start(vte_scrolled, True, True, 0)
         self.vte.connect("child-exited", self.on_vte_done)
 
         self.get_ui("ui_button_reboot").connect("clicked", self.do_reboot)
@@ -262,51 +367,68 @@ class MainWindow(object):
         self.ui_main_window.set_application(application)
         self.ui_main_window.set_title(_("ParsLinux Nvidia Installer"))
 
-        # Add Tray launcher button to HeaderBar
-        self.btn_tray_toggle = Gtk.Button.new_from_icon_name("media-record-symbolic", Gtk.IconSize.BUTTON)
-        self.btn_tray_toggle.set_tooltip_text(_("Sistem Tepsisi Göstergesini Başlat (Tray)"))
-        self.btn_tray_toggle.connect("clicked", lambda b: self.start_tray_indicator())
+        # Add HeaderBar action buttons
         headerbar = self.ui_main_window.get_titlebar()
         if headerbar and isinstance(headerbar, Gtk.HeaderBar):
-            headerbar.pack_end(self.btn_tray_toggle)
-            self.btn_tray_toggle.show()
+            self.btn_header_rescan = Gtk.Button.new_from_icon_name("view-refresh-symbolic")
+            self.btn_header_rescan.set_tooltip_text(_("Donanımı Yeniden Tara (Rescan GPUs)"))
+            self.btn_header_rescan.connect("clicked", lambda b: self.on_rescan_hardware())
+            headerbar.pack_start(self.btn_header_rescan)
 
-        self.ui_main_window.show_all()
+            self.btn_header_diag = Gtk.Button.new_from_icon_name("dialog-information-symbolic")
+            self.btn_header_diag.set_tooltip_text(_("Donanım Raporu & Tanılama"))
+            self.btn_header_diag.connect("clicked", lambda b: self.on_show_hardware_diagnostics())
+            headerbar.pack_start(self.btn_header_diag)
+
+            self.btn_header_snapshot = Gtk.Button.new_from_icon_name("document-save-symbolic")
+            self.btn_header_snapshot.set_tooltip_text(_("Sistem Geri Yükleme Noktası Al (Timeshift)"))
+            self.btn_header_snapshot.connect("clicked", lambda b: self.on_create_snapshot_clicked())
+            headerbar.pack_start(self.btn_header_snapshot)
+
+            self.btn_tray_toggle = Gtk.Button.new_from_icon_name("media-record-symbolic")
+            self.btn_tray_toggle.set_tooltip_text(_("Sistem Tepsisi Göstergesini Başlat (Tray)"))
+            self.btn_tray_toggle.connect("clicked", lambda b: self.start_tray_indicator())
+            headerbar.pack_end(self.btn_tray_toggle)
+
+        self.ui_main_window.present()
 
     def on_simulate_clicked(self, button):
-        self.is_debug = True
-        os.environ["PARSLINUX_NVI_DEBUG"] = "1"
-        self.nvidia_devices = nvidia.graphics()
-        self.ui_main_stack.set_visible_child_name("page_main")
-        self.create_gpu_drivers()
-        self.ui_apply_chg_button.set_sensitive(True)
-        self.ui_repo_switch.set_sensitive(True)
-        self.refresh_telemetry_ui()
-        self.refresh_prime_ui()
-        self.refresh_ai_ui()
+        self.on_simulate_custom_gpu("ampere")
 
     def do_reboot(self, widget):
-        self.ui_confirm_dialog.set_transient_for(widget.get_toplevel())
-        response = self.ui_confirm_dialog.run()
-        self.ui_confirm_dialog.hide()
-        if response != Gtk.ResponseType.OK:
-            return
-        cmd = [
-            "/usr/bin/dbus-send",
-            "--system",
-            "--print-reply",
-            "--dest=org.freedesktop.login1",
-            "/org/freedesktop/login1",
-            "org.freedesktop.login1.Manager.Reboot",
-            "boolean:true",
-        ]
-        try:
-            subprocess.run(cmd)
-        except Exception as e:
-            print(f"Reboot invocation failed: {e}", file=sys.stderr)
+        root = widget.get_root() if hasattr(widget, "get_root") else self.ui_main_window
+        dialog = Gtk.MessageDialog(
+            transient_for=root if isinstance(root, Gtk.Window) else None,
+            modal=True,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.OK_CANCEL,
+            text=_("Warning"),
+        )
+        dialog.set_use_markup(True)
+        dialog.format_secondary_text(
+            _("Changes have been made. To ensure these changes take effect, a system restart is required. Please save any work and click 'OK' to complete the process.")
+        )
+        def _on_reboot_response(dlg, response_id):
+            dlg.destroy()
+            if response_id == Gtk.ResponseType.OK:
+                cmd = [
+                    "/usr/bin/dbus-send",
+                    "--system",
+                    "--print-reply",
+                    "--dest=org.freedesktop.login1",
+                    "/org/freedesktop/login1",
+                    "org.freedesktop.login1.Manager.Reboot",
+                    "boolean:true",
+                ]
+                try:
+                    subprocess.run(cmd)
+                except Exception as e:
+                    print(f"Reboot invocation failed: {e}", file=sys.stderr)
+        dialog.connect("response", _on_reboot_response)
+        dialog.present()
 
     def on_vte_done(self, vte, status):
-        self.get_ui("ui_box_vte_buttons").show_all()
+        self.get_ui("ui_box_vte_buttons").set_visible(True)
 
         try:
             exit_code = os.waitstatus_to_exitcode(status)
@@ -353,11 +475,15 @@ class MainWindow(object):
             self.create_gpu_drivers()
 
     def update_vte_color(self, vte):
-        style_context = self.ui_main_window.get_style_context()
-        background_color = style_context.get_background_color(Gtk.StateFlags.NORMAL)
-        foreground_color = style_context.get_color(Gtk.StateFlags.NORMAL)
-        vte.set_color_background(background_color)
-        vte.set_color_foreground(foreground_color)
+        try:
+            bg = Gdk.RGBA()
+            bg.parse("#0f141c")
+            fg = Gdk.RGBA()
+            fg.parse("#e2e8f0")
+            vte.set_color_background(bg)
+            vte.set_color_foreground(fg)
+        except Exception as e:
+            print(f"Warning: Failed to set VTE colors: {e}", file=sys.stderr)
 
     def vte_start(self, params):
         for w in self.op_widgets:
@@ -370,11 +496,10 @@ class MainWindow(object):
             os.environ.get("HOME", "/tmp"),
             params,
             None,
-            GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            GLib.SpawnFlags.DEFAULT,
             None,
             None,
             -1,
-            None,
             None,
             None,
         )
@@ -411,9 +536,16 @@ class MainWindow(object):
         self.driver_buttons = []
 
         for nvidia_device in self.nvidia_devices:
-            gpu_info = self.gpu_box(nvidia_device.device_name)
+            gpu_info = self.gpu_box(nvidia_device)
             self.gpu_info_arr.append(gpu_info)
             self.ui_gpu_info_box.pack_start(gpu_info, True, True, 5)
+
+        # Build auto-detection engine card above driver selection
+        if hasattr(self, "auto_detect_card") and self.auto_detect_card.get_parent() is not None:
+            self.auto_detect_card.get_parent().remove(self.auto_detect_card)
+        self.auto_detect_card = self.build_auto_detect_card()
+        self.ui_controller_box.pack_start(self.auto_detect_card, False, False, 4)
+        self.ui_controller_box.reorder_child(self.auto_detect_card, 1)
 
         self.nvidia_drivers = nvidia.drivers(gpus=self.nvidia_devices)
         self.filtered_nvidia_drivers = []
@@ -435,6 +567,8 @@ class MainWindow(object):
                 nvidia_driver.version,
                 nvidia_driver.type,
                 nvidia_driver.repo,
+                is_recommended=getattr(nvidia_driver, "is_recommended", False),
+                rec_reason=getattr(nvidia_driver, "recommendation_reason", ""),
             )
 
             if nvidia_driver.installed:
@@ -449,24 +583,236 @@ class MainWindow(object):
         self.ui_gpu_box.show_all()
         self.ui_apply_chg_button.set_sensitive(self.check_initials())
 
+    def build_auto_detect_card(self):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        card.get_style_context().add_class("auto-detect-card")
+
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        lbl_icon = Gtk.Label(label="✨")
+        lbl_title = Gtk.Label()
+        lbl_title.set_markup('<span font_weight="bold" foreground="#10B981">Kart Otomatik Algılama &amp; Sürücü Tavsiye Motoru</span>')
+        header.pack_start(lbl_icon, False, False, 0)
+        header.pack_start(lbl_title, False, False, 0)
+        card.pack_start(header, False, False, 0)
+
+        dev = self.nvidia_devices[0] if self.nvidia_devices else None
+        dev_name = dev.device_name if dev else _("NVIDIA Grafik Kartı")
+        arch_name = getattr(dev, "architecture", "Modern") if dev else "Modern"
+        rec_driver = getattr(dev, "recommended_driver", "nvidia-driver") if dev else "nvidia-driver"
+        rec_reason = getattr(dev, "recommendation_reason", "") if dev else ""
+
+        self.lbl_autodetect_info = Gtk.Label(xalign=0)
+        info_text = f"<b>Donanım:</b> {dev_name}  •  <b>Mimari:</b> {arch_name}\n"
+        info_text += f"<b>Önerilen Sürücü:</b> <span foreground='#38BDF8'><b>{rec_driver}</b></span>"
+        if rec_reason:
+            info_text += f" <span foreground='#94A3B8'>({rec_reason})</span>"
+        self.lbl_autodetect_info.set_markup(info_text)
+        self.lbl_autodetect_info.set_line_wrap(True)
+        card.pack_start(self.lbl_autodetect_info, False, False, 0)
+
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        btn_auto_select = Gtk.Button.new_with_label(_("✨ Önerilen Sürücüyü Otomatik Seç"))
+        btn_auto_select.get_style_context().add_class("auto-detect-btn")
+        btn_auto_select.connect("clicked", self.on_auto_select_recommended)
+        btn_box.pack_start(btn_auto_select, False, False, 0)
+
+        btn_diag = Gtk.Button.new_with_label(_("🔍 Donanım Raporu"))
+        btn_diag.get_style_context().add_class("diag-btn")
+        btn_diag.connect("clicked", self.on_show_hardware_diagnostics)
+        btn_box.pack_start(btn_diag, False, False, 0)
+
+        card.pack_start(btn_box, False, False, 2)
+
+        self.lbl_autodetect_feedback = Gtk.Label(xalign=0)
+        card.pack_start(self.lbl_autodetect_feedback, False, False, 0)
+
+        card.show_all()
+        return card
+
+    def on_auto_select_recommended(self, button=None):
+        rec_drv = None
+        for drv in self.nvidia_drivers:
+            if getattr(drv, "is_recommended", False):
+                rec_drv = drv
+                break
+        if not rec_drv and len(self.nvidia_drivers) > 1:
+            rec_drv = self.nvidia_drivers[1]
+        elif not rec_drv and len(self.nvidia_drivers) > 0:
+            rec_drv = self.nvidia_drivers[0]
+
+        if rec_drv:
+            for idx, drv in enumerate(self.nvidia_drivers):
+                if drv == rec_drv:
+                    if idx < len(self.drv_arr):
+                        self.drv_arr[idx].set_active(True)
+                        self.toggled_driver = drv
+                    break
+
+            if hasattr(self, "lbl_autodetect_feedback"):
+                self.lbl_autodetect_feedback.set_markup(
+                    f'<span foreground="#10B981" font_weight="bold">✓ Önerilen sürücü ({rec_drv.package} v{rec_drv.version}) başarıyla seçildi!</span>'
+                )
+            self.ui_apply_chg_button.set_sensitive(self.check_initials())
+
+    def on_show_hardware_diagnostics(self, button=None):
+        dialog = Gtk.Dialog(
+            title=_("🔍 GPU & Donanım Tanılama Raporu"),
+            transient_for=self.ui_main_window,
+            use_header_bar=True,
+        )
+        dialog.set_default_size(580, 480)
+        dialog.add_button(_("📋 Panoya Kopyala"), Gtk.ResponseType.APPLY)
+        dialog.add_button(_("Kapat"), Gtk.ResponseType.CLOSE)
+
+        content_area = dialog.get_content_area()
+        content_area.set_spacing(10)
+        content_area.set_margin_start(12)
+        content_area.set_margin_end(12)
+        content_area.set_margin_top(12)
+        content_area.set_margin_bottom(12)
+
+        lbl = Gtk.Label(xalign=0)
+        lbl.set_markup('<span font_weight="bold" font_size="large" foreground="#38BDF8">📊 Sistem Grafik Donanım Raporu</span>')
+        content_area.pack_start(lbl, False, False, 0)
+
+        report_text = detector.generate_hardware_report()
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_hexpand(True)
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+
+        textview = Gtk.TextView()
+        textview.set_editable(False)
+        textview.set_cursor_visible(False)
+        textview.set_monospace(True)
+        textview.set_wrap_mode(Gtk.WrapMode.NONE)
+        textview.get_buffer().set_text(report_text)
+        scrolled.set_child(textview)
+        content_area.pack_start(scrolled, True, True, 0)
+
+        def _on_diag_response(dlg, response):
+            if response == Gtk.ResponseType.APPLY:
+                display = Gdk.Display.get_default()
+                if display:
+                    clipboard = display.get_clipboard()
+                    clipboard.set(report_text)
+            dlg.destroy()
+
+        dialog.connect("response", _on_diag_response)
+        dialog.present()
+
+    def on_rescan_hardware(self, button=None):
+        self.nvidia_devices = nvidia.graphics()
+        marker_present = not package.check_sec_state()
+        self.disabled_no_devices = (
+            not self.nvidia_devices and marker_present and not self.is_debug
+        )
+        if self.ui_detected_gpu_label:
+            detected = get_system_gpu_description()
+            self.ui_detected_gpu_label.set_markup(
+                f'<span foreground="#94A3B8"><b>Sistemdeki Donanım:</b> {detected}</span>'
+            )
+        if not self.disabled_no_devices and len(self.nvidia_devices) > 0:
+            self.ui_main_stack.set_visible_child_name("page_main")
+            self.create_gpu_drivers()
+            self.ui_apply_chg_button.set_sensitive(True)
+            self.ui_repo_switch.set_sensitive(True)
+            self.refresh_telemetry_ui()
+            self.refresh_prime_ui()
+            self.refresh_ai_ui()
+        else:
+            self.ui_main_stack.set_visible_child(self.ui_novidia_box)
+
+    def on_simulate_custom_gpu(self, gpu_type="ampere"):
+        self.is_debug = True
+        os.environ["PARSLINUX_NVI_DEBUG"] = "1"
+        if gpu_type == "ada":
+            arch, arch_desc, rec_pkg, rec_reason = detector.identify_architecture(0x2782, "NVIDIA GeForce RTX 4070 Ti")
+            self.nvidia_devices = [
+                nvidia.NvidiaDevice(
+                    vendor_id=0x10DE,
+                    vendor_name="NVIDIA Corporation",
+                    device_id=0x2782,
+                    device_name="NVIDIA GeForce RTX 4070 Ti [AD104] (Simüle)",
+                    driver_name="nvidia",
+                    driver_version="550.120",
+                    is_secondary_gpu=False,
+                    pci_slot="0000:01:00.0",
+                    architecture=arch,
+                    architecture_desc=arch_desc,
+                    recommended_driver=rec_pkg,
+                    recommendation_reason=rec_reason,
+                )
+            ]
+        elif gpu_type == "kepler":
+            arch, arch_desc, rec_pkg, rec_reason = detector.identify_architecture(0x1187, "NVIDIA GeForce GTX 760")
+            self.nvidia_devices = [
+                nvidia.NvidiaDevice(
+                    vendor_id=0x10DE,
+                    vendor_name="NVIDIA Corporation",
+                    device_id=0x1187,
+                    device_name="NVIDIA GeForce GTX 760 [GK104] (Simüle / Legacy)",
+                    driver_name="nouveau",
+                    driver_version=None,
+                    is_secondary_gpu=False,
+                    pci_slot="0000:01:00.0",
+                    architecture=arch,
+                    architecture_desc=arch_desc,
+                    recommended_driver=rec_pkg,
+                    recommendation_reason=rec_reason,
+                )
+            ]
+        else: # ampere
+            arch, arch_desc, rec_pkg, rec_reason = detector.identify_architecture(0x2503, "NVIDIA GeForce RTX 3060")
+            self.nvidia_devices = [
+                nvidia.NvidiaDevice(
+                    vendor_id=0x10DE,
+                    vendor_name="NVIDIA Corporation",
+                    device_id=0x2503,
+                    device_name="NVIDIA GeForce RTX 3060 [GA106] (Simüle)",
+                    driver_name="nvidia",
+                    driver_version="550.120",
+                    is_secondary_gpu=False,
+                    pci_slot="0000:01:00.0",
+                    architecture=arch,
+                    architecture_desc=arch_desc,
+                    recommended_driver=rec_pkg,
+                    recommendation_reason=rec_reason,
+                )
+            ]
+        self.ui_main_stack.set_visible_child_name("page_main")
+        self.create_gpu_drivers()
+        self.ui_apply_chg_button.set_sensitive(True)
+        self.ui_repo_switch.set_sensitive(True)
+        self.refresh_telemetry_ui()
+        self.refresh_prime_ui()
+        self.refresh_ai_ui()
+
     def get_ui(self, object_name: str):
         return self.gtk_builder.get_object(object_name)
 
-    def driver_box(self, drv_name, drv_ver, drv_type, drv_repo):
+    def driver_box(self, drv_name, drv_ver, drv_type, drv_repo, is_recommended=False, rec_reason=""):
         toggle_ui = os.path.normpath(os.path.join(os.path.dirname(__file__), "../ui/driver_toggle.glade"))
-        b = Gtk.Builder.new_from_file(toggle_ui)
+        b = self._build_ui_file(toggle_ui)
         btn = b.get_object("ui_radio_button")
         btn.set_name(drv_name)
 
         name = b.get_object("ui_name_label")
         markup = self.lbl_markup(_("Driver"), drv_name)
+        if is_recommended:
+            markup += '  <span background="#059669" foreground="#ffffff" weight="bold" font_size="small">  ★ ÖNERİLEN  </span>'
         name.set_markup(markup)
 
         ver = b.get_object("ui_version_label")
         markup = self.lbl_markup(_("Version"), drv_ver)
         ver.set_markup(markup)
 
-        markup = self.lbl_markup(_("Description"), drv_type, color="dodgerblue")
+        desc_label = drv_type
+        if is_recommended and rec_reason:
+            desc_label = f"{drv_type} — {rec_reason}"
+        markup = self.lbl_markup(_("Description"), desc_label, color="#10B981" if is_recommended else "dodgerblue")
         if drv_name == nouveau:
             markup = self.lbl_markup(
                 _("Description"), drv_type, color="mediumspringgreen"
@@ -481,15 +827,37 @@ class MainWindow(object):
         grp = None
         if len(self.driver_buttons) > 0:
             grp = self.driver_buttons[0]
-        btn.join_group(grp)
+        if hasattr(btn, "set_group"):
+            btn.set_group(grp)
+        elif hasattr(btn, "join_group"):
+            btn.join_group(grp)
+        btn.get_style_context().add_class("driver-card")
         self.driver_buttons.append(btn)
         return btn
 
-    def gpu_box(self, device_name):
-        box = Gtk.Box.new(Gtk.Orientation.VERTICAL, 13)
+    def gpu_box(self, device):
+        box = Gtk.Box.new(Gtk.Orientation.VERTICAL, 4)
+        name_str = device.device_name if hasattr(device, "device_name") else str(device)
         name_label = Gtk.Label(xalign=0)
-        name_label.set_markup(f"<b>{device_name}</b>")
-        box.pack_start(name_label, True, True, 0)
+        name_label.set_markup(f"<span font_weight='bold' font_size='12000' foreground='#f8fafc'>{name_str}</span>")
+        box.pack_start(name_label, False, False, 0)
+
+        details = []
+        arch = getattr(device, "architecture", None)
+        if arch:
+            details.append(f"<b>Mimari:</b> {arch}")
+        pci = getattr(device, "pci_slot", None)
+        if pci:
+            details.append(f"<b>PCI:</b> {pci}")
+        mod = getattr(device, "driver_name", None)
+        if mod:
+            details.append(f"<b>Aktif Modül:</b> {mod}")
+
+        if details:
+            sub_label = Gtk.Label(xalign=0)
+            sub_label.set_markup(f"<span font_size='small' foreground='#94a3b8'>{'   •   '.join(details)}</span>")
+            box.pack_start(sub_label, False, False, 0)
+
         return box
 
     def lbl_markup(self, label, desc, color=None):
@@ -555,12 +923,12 @@ class MainWindow(object):
         dialog.format_secondary_text(
             _("The package list has been refreshed. Please choose a driver again.")
         )
-        dialog.run()
-        dialog.destroy()
+        dialog.connect("response", lambda d, r: d.destroy())
+        dialog.present()
 
     def on_about_button_clicked(self, button):
-        self.ui_about_dialog.run()
-        self.ui_about_dialog.hide()
+        if self.ui_about_dialog:
+            self.ui_about_dialog.present()
 
     def check_initials(self):
         sec_gpu_changes = (
@@ -626,7 +994,7 @@ class MainWindow(object):
         lbl_title.set_halign(Gtk.Align.START)
         header_box.pack_start(lbl_title, True, True, 0)
 
-        btn_refresh = Gtk.Button.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
+        btn_refresh = Gtk.Button.new_from_icon_name("view-refresh-symbolic")
         btn_refresh.set_tooltip_text(_("Sensörleri Yenile"))
         btn_refresh.connect("clicked", lambda b: self.refresh_telemetry_ui())
         header_box.pack_end(btn_refresh, False, False, 0)
@@ -795,6 +1163,64 @@ class MainWindow(object):
 
         box.pack_start(card_ctrl, False, False, 0)
 
+        # 4. Overclocking Card
+        card_oc = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card_oc.get_style_context().add_class("monitor-card")
+
+        oc_header = Gtk.Label()
+        oc_header.set_markup('<span font_weight="bold" foreground="#38BDF8">🚀 GPU Hız Aşırtma &amp; Frekans Ofseti (Overclocking)</span>')
+        oc_header.set_halign(Gtk.Align.START)
+        card_oc.pack_start(oc_header, False, False, 0)
+
+        oc_desc = Gtk.Label()
+        oc_desc.set_markup('<span font_size="small" foreground="#94A3B8">NVIDIA GPU çekirdek ve video belleği için saat frekansı ofsetlerini ayarlayın:</span>')
+        oc_desc.set_line_wrap(True)
+        oc_desc.set_halign(Gtk.Align.START)
+        card_oc.pack_start(oc_desc, False, False, 0)
+
+        oc_info = monitor.get_overclock_settings()
+
+        # Core Clock Offset Row
+        row_core = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        lbl_core = Gtk.Label(label=_("🎯 Çekirdek (Core MHz):"))
+        lbl_core.set_halign(Gtk.Align.START)
+        self.scale_core_oc = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, -200, 300, 10)
+        self.scale_core_oc.set_value(oc_info["core_offset"])
+        self.scale_core_oc.set_digits(0)
+        self.scale_core_oc.set_value_pos(Gtk.PositionType.RIGHT)
+        row_core.pack_start(lbl_core, False, False, 0)
+        row_core.pack_start(self.scale_core_oc, True, True, 0)
+        card_oc.pack_start(row_core, False, False, 2)
+
+        # Memory Clock Offset Row
+        row_mem = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        lbl_mem = Gtk.Label(label=_("🧠 Bellek (Memory MHz):"))
+        lbl_mem.set_halign(Gtk.Align.START)
+        self.scale_mem_oc = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, -500, 1500, 25)
+        self.scale_mem_oc.set_value(oc_info["mem_offset"])
+        self.scale_mem_oc.set_digits(0)
+        self.scale_mem_oc.set_value_pos(Gtk.PositionType.RIGHT)
+        row_mem.pack_start(lbl_mem, False, False, 0)
+        row_mem.pack_start(self.scale_mem_oc, True, True, 0)
+        card_oc.pack_start(row_mem, False, False, 2)
+
+        # Buttons Row
+        btn_oc_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        btn_oc_box.set_halign(Gtk.Align.END)
+
+        btn_reset_oc = Gtk.Button(label=_("🔄 Varsayılana Sıfırla (0 MHz)"))
+        btn_reset_oc.connect("clicked", lambda b: self.on_reset_overclock())
+
+        btn_apply_oc = Gtk.Button(label=_("⚡ Hız Aşırtmayı Uygula"))
+        btn_apply_oc.get_style_context().add_class("suggested-action")
+        btn_apply_oc.connect("clicked", lambda b: self.on_apply_overclock())
+
+        btn_oc_box.pack_start(btn_reset_oc, False, False, 0)
+        btn_oc_box.pack_start(btn_apply_oc, False, False, 0)
+        card_oc.pack_start(btn_oc_box, False, False, 4)
+
+        box.pack_start(card_oc, False, False, 0)
+
         self.refresh_telemetry_ui()
         self.refresh_prime_ui()
         return box
@@ -866,6 +1292,48 @@ class MainWindow(object):
         card_game.pack_start(btn_test, False, False, 8)
 
         box.pack_start(card_game, False, False, 0)
+
+        # MangoHud Card
+        card_hud = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card_hud.get_style_context().add_class("card-box")
+
+        hud_header = Gtk.Label()
+        hud_header.set_markup('<span font_weight="bold" foreground="#38BDF8">🎯 Oyun İçi Canlı HUD &amp; FPS Göstergesi (MangoHud)</span>')
+        hud_header.set_halign(Gtk.Align.START)
+        card_hud.pack_start(hud_header, False, False, 0)
+
+        hud_desc = Gtk.Label()
+        hud_desc.set_markup('<span font_size="small" foreground="#94A3B8">Oyun oynarken ekranın sol üstünde anlık FPS, GPU/CPU sıcaklığı ve VRAM kullanımını gösterir. (Kısayol: Sağ Shift + F12)</span>')
+        hud_desc.set_line_wrap(True)
+        hud_desc.set_halign(Gtk.Align.START)
+        card_hud.pack_start(hud_desc, False, False, 0)
+
+        hud_status = monitor.get_mangohud_status()
+        row_hud = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        lbl_hud_enable = Gtk.Label()
+        lbl_hud_enable.set_markup('<b>ParsLinux Oyun İçi Telemetri Katmanını Etkinleştir</b>')
+        lbl_hud_enable.set_halign(Gtk.Align.START)
+
+        self.switch_mangohud = Gtk.Switch()
+        self.switch_mangohud.set_active(hud_status["enabled"])
+        self.switch_mangohud.connect("state-set", self.on_toggle_mangohud)
+        row_hud.pack_start(lbl_hud_enable, True, True, 0)
+        row_hud.pack_end(self.switch_mangohud, False, False, 0)
+        card_hud.pack_start(row_hud, False, False, 4)
+
+        if not hud_status["installed"]:
+            row_install = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            lbl_not_inst = Gtk.Label()
+            lbl_not_inst.set_markup('<span foreground="#F59E0B" font_size="small">⚠️ MangoHud sistemde kurulu değil.</span>')
+            lbl_not_inst.set_halign(Gtk.Align.START)
+            btn_inst_hud = Gtk.Button(label=_("📦 MangoHud Yükle"))
+            btn_inst_hud.get_style_context().add_class("prime-btn")
+            btn_inst_hud.connect("clicked", lambda b: self.on_install_mangohud())
+            row_install.pack_start(lbl_not_inst, True, True, 0)
+            row_install.pack_end(btn_inst_hud, False, False, 0)
+            card_hud.pack_start(row_install, False, False, 2)
+
+        box.pack_start(card_hud, False, False, 0)
         return box
 
     def build_ai_page(self):
@@ -1052,11 +1520,78 @@ class MainWindow(object):
         params = ["/usr/bin/pkexec", exec_path, "set-game-offload", arg]
         self.vte_start(params)
 
+    def on_apply_overclock(self):
+        core = int(self.scale_core_oc.get_value())
+        mem = int(self.scale_mem_oc.get_value())
+        self.apt_opr = "set-overclock"
+        exec_path = get_package_exec_path()
+        params = ["/usr/bin/pkexec", exec_path, "set-overclock", str(core), str(mem)]
+        self.vte_start(params)
+
+    def on_reset_overclock(self):
+        if hasattr(self, "scale_core_oc"):
+            self.scale_core_oc.set_value(0)
+        if hasattr(self, "scale_mem_oc"):
+            self.scale_mem_oc.set_value(0)
+        self.on_apply_overclock()
+
+    def on_toggle_mangohud(self, switch, state):
+        monitor.set_mangohud_profile(state)
+
+    def on_install_mangohud(self):
+        self.apt_opr = "install-extra"
+        exec_path = get_package_exec_path()
+        params = ["/usr/bin/pkexec", exec_path, "install-extra", "mangohud"]
+        self.vte_start(params)
+
+    def on_create_snapshot_clicked(self):
+        if not monitor.is_timeshift_installed():
+            dialog = Gtk.MessageDialog(
+                transient_for=self.ui_main_window,
+                modal=True,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK_CANCEL,
+                text=_("Timeshift Kurulu Değil"),
+            )
+            dialog.format_secondary_text(
+                _("Sistem geri yükleme noktası oluşturmak için Timeshift gereklidir. Şimdi Timeshift paketini yüklemek ister misiniz?")
+            )
+            def _on_install_timeshift(dlg, resp):
+                dlg.destroy()
+                if resp == Gtk.ResponseType.OK:
+                    exec_path = get_package_exec_path()
+                    self.apt_opr = "install-extra"
+                    self.vte_start(["/usr/bin/pkexec", exec_path, "install-extra", "timeshift"])
+            dialog.connect("response", _on_install_timeshift)
+            dialog.present()
+            return
+
+        dialog = Gtk.MessageDialog(
+            transient_for=self.ui_main_window,
+            modal=True,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.OK_CANCEL,
+            text=_("Sistem Geri Yükleme Noktası Oluştur"),
+        )
+        dialog.format_secondary_text(
+            _("Sürücü ve donanım yapılandırması öncesinde Timeshift ile sistem yedeği alınsın mı?")
+        )
+        def _on_confirm_snapshot(dlg, resp):
+            dlg.destroy()
+            if resp == Gtk.ResponseType.OK:
+                exec_path = get_package_exec_path()
+                self.apt_opr = "create-snapshot"
+                self.vte_start(["/usr/bin/pkexec", exec_path, "create-snapshot", "ParsLinux-NVI-Backup"])
+        dialog.connect("response", _on_confirm_snapshot)
+        dialog.present()
+
     def launch_game_with_nvidia(self, bin_name):
         env = os.environ.copy()
         env["__NV_PRIME_RENDER_OFFLOAD"] = "1"
         env["__GLX_VENDOR_LIBRARY_NAME"] = "nvidia"
         env["__VK_LAYER_NV_optimus"] = "NVIDIA_only"
+        if monitor.get_mangohud_status()["enabled"]:
+            env["MANGOHUD"] = "1"
         try:
             subprocess.Popen([bin_name], env=env)
         except Exception as e:
@@ -1066,6 +1601,8 @@ class MainWindow(object):
         env = os.environ.copy()
         env["__NV_PRIME_RENDER_OFFLOAD"] = "1"
         env["__GLX_VENDOR_LIBRARY_NAME"] = "nvidia"
+        if monitor.get_mangohud_status()["enabled"]:
+            env["MANGOHUD"] = "1"
         for cmd in ("vkcube", "glxgears"):
             if shutil.which(cmd):
                 try:
@@ -1076,7 +1613,9 @@ class MainWindow(object):
         print("Neither vkcube nor glxgears installed for benchmark test", file=sys.stderr)
 
     def start_tray_indicator(self):
-        import tray
-        if not hasattr(self, "tray_instance") or self.tray_instance is None:
-            self.tray_instance = tray.run_tray_indicator(on_open_callback=self.ui_main_window.present)
+        tray_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tray.py")
+        try:
+            subprocess.Popen([sys.executable, tray_script])
+        except Exception as e:
+            print(f"Failed to start tray indicator: {e}", file=sys.stderr)
 

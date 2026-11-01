@@ -28,18 +28,18 @@ except Exception:
 
 # Try importing apt and apt_pkg
 try:
-    import apt
-    import apt_pkg
+    import apt  # type: ignore
+    import apt_pkg  # type: ignore
     apt_pkg.init_system()
     HAS_APT = True
-except ImportError:
+except (ImportError, AttributeError):
     HAS_APT = False
     apt = None
     apt_pkg = None
 
 nvidia_pci_id = "10DE"
 nvidia_pci_id_int = 0x10DE
-nvidia_devices_json_path = "/../data/nvidia-pci.json"
+nvidia_devices_json_path = "../data/nvidia-pci.json"
 nouveau = "xserver-xorg-video-nouveau"
 
 dest = "/etc/apt/sources.list.d/nvidia-drivers.list"
@@ -124,16 +124,27 @@ def reopen_cache():
     _cache_instance = MockAptCache()
 
 
+try:
+    import detector
+except ImportError:
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import detector
+
+
 class NvidiaDriver:
-    def __init__(self, package, version, type, repo, installed=False):
+    def __init__(self, package, version, type, repo, installed=False, is_recommended=False, recommendation_reason=""):
         self.package = package
         self.version = version
         self.type = type
         self.repo = repo
         self.installed = installed
+        self.is_recommended = is_recommended
+        self.recommendation_reason = recommendation_reason
 
     def __str__(self) -> str:
-        return f"package:{self.package}, version:{self.version}, type:{self.type}, repo:{self.repo}, installed:{self.installed}"
+        rec = " [RECOMMENDED]" if self.is_recommended else ""
+        return f"package:{self.package}, version:{self.version}, type:{self.type}, repo:{self.repo}, installed:{self.installed}{rec}"
 
     def __eq__(self, other):
         if not isinstance(other, NvidiaDriver):
@@ -156,6 +167,11 @@ class NvidiaDevice:
         driver_name: str = None,
         driver_version: str = None,
         is_secondary_gpu: bool = True,
+        pci_slot: str = None,
+        architecture: str = None,
+        architecture_desc: str = None,
+        recommended_driver: str = None,
+        recommendation_reason: str = None,
     ):
         self.vendor_id = vendor_id
         self.vendor_name = vendor_name
@@ -168,6 +184,11 @@ class NvidiaDevice:
         self.driver_name = driver_name
         self.driver_version = driver_version
         self.is_secondary_gpu = is_secondary_gpu
+        self.pci_slot = pci_slot
+        self.architecture = architecture
+        self.architecture_desc = architecture_desc
+        self.recommended_driver = recommended_driver
+        self.recommendation_reason = recommendation_reason
 
 
 def source():
@@ -236,65 +257,32 @@ def is_debug_mode():
 
 
 def graphics():
-    pci_dev_path = "/sys/bus/pci/devices/"
-    pci_ids = get_pci_ids()
     devices = []
 
-    if os.path.exists(pci_dev_path):
-        for paths, dirs, files in os.walk(pci_dev_path):
-            if dirs:
-                for d in dirs:
-                    vp = os.path.join(pci_dev_path, d, "vendor")
-                    vc_raw = readfile(vp)
-                    if vc_raw is None:
-                        continue
-                    try:
-                        vc = int(vc_raw, 16)
-                    except (TypeError, ValueError):
-                        continue
-                    if vc != nvidia_pci_id_int:
-                        continue
-
-                    sp = os.path.join(pci_dev_path, d, "class")
-                    sc = readfile(sp)
-                    if sc is None or not sc.startswith("0x03"):
-                        continue
-
-                    # Secondary boot_vga is "1" only on primary display card
-                    bv = readfile(os.path.join(pci_dev_path, d, "boot_vga"))
-                    st = (bv != "1")
-
-                    dp = os.path.join(pci_dev_path, d, "device")
-                    dc_raw = readfile(dp)
-                    if dc_raw is None:
-                        continue
-                    try:
-                        dc = int(dc_raw, 16)
-                    except (TypeError, ValueError):
-                        continue
-
-                    vendor_entry = pci_ids.get(vc, {})
-                    vn = vendor_entry.get("vendor_name", "NVIDIA Corporation")
-                    dn = vendor_entry.get("devices", {}).get(
-                        dc, f"NVIDIA Device {dc:04X}"
-                    )
-
-                    drv_c = None
-                    drv_ver_c = None
-
-                    drv_p = os.path.join(pci_dev_path, d, "driver", "module")
-                    if os.path.islink(drv_p):
-                        try:
-                            orig_drv_p = os.readlink(drv_p)
-                            drv_c = os.path.basename(orig_drv_p)
-                            drv_ver_p = os.path.join(drv_p, "version")
-                            drv_ver_c = readfile(drv_ver_p)
-                        except OSError:
-                            pass
-                    devices.append(NvidiaDevice(vc, vn, dc, dn, drv_c, drv_ver_c, st))
+    # Use multi-layer detector
+    detected_gpus = detector.detect_all_system_gpus()
+    for g in detected_gpus:
+        if g.get("is_nvidia"):
+            devices.append(
+                NvidiaDevice(
+                    vendor_id=g.get("vendor_id"),
+                    vendor_name=g.get("vendor_name"),
+                    device_id=g.get("device_id"),
+                    device_name=g.get("device_name"),
+                    driver_name=g.get("driver_module"),
+                    driver_version=g.get("driver_version"),
+                    is_secondary_gpu=not g.get("is_primary", False),
+                    pci_slot=g.get("pci_slot"),
+                    architecture=g.get("architecture"),
+                    architecture_desc=g.get("architecture_desc"),
+                    recommended_driver=g.get("recommended_driver"),
+                    recommendation_reason=g.get("recommendation_reason"),
+                )
+            )
 
     # If in debug mode and no physical NVIDIA card was found, provide simulated card
     if not devices and is_debug_mode():
+        arch, arch_desc, rec_pkg, rec_reason = detector.identify_architecture(0x2503, "NVIDIA GeForce RTX 3060")
         devices.append(
             NvidiaDevice(
                 vendor_id=0x10DE,
@@ -304,6 +292,11 @@ def graphics():
                 driver_name="nvidia",
                 driver_version="550.120",
                 is_secondary_gpu=False,
+                pci_slot="0000:01:00.0",
+                architecture=arch,
+                architecture_desc=arch_desc,
+                recommended_driver=rec_pkg,
+                recommendation_reason=rec_reason,
             )
         )
 
@@ -320,16 +313,17 @@ def get_package_info(package_name):
     for version in versions:
         origins = version.origins
         for orig in origins:
-            if orig.origin not in ver_list and len(orig.origin) > 1:
+            if not orig or not getattr(orig, "origin", None) or len(orig.origin) <= 1:
+                continue
+            if orig.origin not in ver_list:
                 ver_list[orig.origin] = version.version
             else:
-                if orig.origin in ver_list:
-                    if HAS_APT and hasattr(apt_pkg, "version_compare"):
-                        result = apt_pkg.version_compare(ver_list[orig.origin], version.version)
-                    else:
-                        result = _compare_version_fallback(ver_list[orig.origin], version.version)
-                    if result < 0:
-                        ver_list[orig.origin] = version.version
+                if HAS_APT and hasattr(apt_pkg, "version_compare"):
+                    result = apt_pkg.version_compare(ver_list[orig.origin], version.version)
+                else:
+                    result = _compare_version_fallback(ver_list[orig.origin], version.version)
+                if result < 0:
+                    ver_list[orig.origin] = version.version
     return ver_list
 
 
@@ -369,14 +363,20 @@ def drivers(gpus=None):
     if len(gpus) < 1:
         return driver_results
 
-    json_path = os.path.normpath(os.path.join(os.path.dirname(__file__), ".." + nvidia_devices_json_path))
+    possible_json_paths = [
+        os.path.normpath(os.path.join(os.path.dirname(__file__), "../data/nvidia-pci.json")),
+        "/usr/share/parslinux/parslinux-nvidia-installer/data/nvidia-pci.json",
+        "/usr/share/pardus/pardus-nvidia-installer/data/nvidia-pci.json",
+    ]
     parsed_nvidia_drivers = {}
-    if os.path.isfile(json_path):
-        try:
-            with open(json_path, "r", encoding="utf-8") as f:
-                parsed_nvidia_drivers = json.loads(f.read())
-        except Exception as e:
-            print(f"Warning: Failed to load nvidia-pci.json: {e}", file=sys.stderr)
+    for jp in possible_json_paths:
+        if os.path.isfile(jp):
+            try:
+                with open(jp, "r", encoding="utf-8") as f:
+                    parsed_nvidia_drivers = json.loads(f.read())
+                break
+            except Exception as e:
+                print(f"Warning: Failed to load {jp}: {e}", file=sys.stderr)
 
     nouveau_ver = get_pkg_ver(nouveau)
     driver_results.append(
@@ -429,6 +429,8 @@ def drivers(gpus=None):
         driver_results.append(
             NvidiaDriver("nvidia-tesla-470-driver", "470.256.02-1", _("Legacy Driver"), "Debian", False)
         )
+    # Automatically identify and tag the best recommended driver
+    detector.tag_recommended_driver(driver_results, gpus)
 
     return driver_results
 
@@ -471,3 +473,10 @@ def get_pkg_ver(pkg):
         if pkg_obj.versions:
             return pkg_obj.versions[0].version
     return "1:1.0.17-3"
+
+
+# Convenience aliases for hardware detection engine
+detect_all_system_gpus = detector.detect_all_system_gpus
+generate_hardware_report = detector.generate_hardware_report
+identify_architecture = detector.identify_architecture
+
